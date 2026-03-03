@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BTC Live Trader Pro</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" type="image/png" href="https://cryptologos.cc/logos/bitcoin-btc-logo.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body, html { height: 100vh; height: 100dvh; width: 100%; overflow: hidden; background-color: #0f172a; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: contain; }
+        #root { height: 100%; width: 100%; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.3); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3b82f6; border-radius: 20px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+        @keyframes bounce-slow { 0%, 100% { transform: translateY(-3%); } 50% { transform: translateY(3%); } }
+        .flash-up { animation: flash-green 0.5s ease-out; }
+        .flash-down { animation: flash-red 0.5s ease-out; }
+        @keyframes flash-green { 0% { color: #4ade80; text-shadow: 0 0 15px rgba(74, 222, 128, 0.6); } 100% { color: white; } }
+        @keyframes flash-red { 0% { color: #f87171; text-shadow: 0 0 15px rgba(248, 113, 113, 0.6); } 100% { color: white; } }
+        .progress-bar { transition: width 1s linear; }
+        @keyframes pulse-border { 0% { border-color: rgba(59, 130, 246, 0.5); } 50% { border-color: rgba(59, 130, 246, 1); box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); } 100% { border-color: rgba(59, 130, 246, 0.5); } }
+        .border-pulse { animation: pulse-border 2s infinite; }
+        
+        /* Popup Animation */
+        @keyframes slide-in-top {
+            0% { transform: translateY(-100%); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .notification-pop { animation: slide-in-top 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both; }
+        
+        /* Checkbox styling */
+        .checkbox-wrapper input:checked + div {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .checkbox-wrapper input:checked + div svg {
+            display: block;
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // Icons
+        const Icon = ({ children, size = 20, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>);
+        const ArrowUpCircle = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></Icon>;
+        const ArrowDownCircle = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><path d="m8 12 4 4 4-4"/><path d="M12 8v8"/></Icon>;
+        const Activity = (props) => <Icon {...props}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></Icon>;
+        const TrendingUp = (props) => <Icon {...props}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></Icon>;
+        const TrendingDown = (props) => <Icon {...props}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></Icon>;
+        const DollarSign = (props) => <Icon {...props}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></Icon>;
+        const Settings = (props) => <Icon {...props}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>;
+        const X = (props) => <Icon {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+        const FileText = (props) => <Icon {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></Icon>;
+        const Info = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+        const Globe = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Icon>;
+        const Calendar = (props) => <Icon {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
+        const Hand = (props) => <Icon {...props}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></Icon>;
+        const BarChart = (props) => <Icon {...props}><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></Icon>;
+        const Maximize = (props) => <Icon {...props}><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></Icon>;
+        const Zap = (props) => <Icon {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></Icon>;
+        const ArrowRight = (props) => <Icon {...props}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>;
+        const Timer = (props) => <Icon {...props}><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></Icon>;
+        const Moon = (props) => <Icon {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>;
+        const Sun = (props) => <Icon {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>;
+        const Filter = (props) => <Icon {...props}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Icon>;
+        const Target = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></Icon>;
+        const Shield = (props) => <Icon {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Icon>;
+        const AlertOctagon = (props) => <Icon {...props}><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+        const LinkIcon = (props) => <Icon {...props}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></Icon>;
+        const AlertTriangle = (props) => <Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>;
+        const CandlestickChart = (props) => <Icon {...props}><path d="M9 5v4"/><rect width="4" height="6" x="7" y="9" rx="1"/><path d="M9 15v2"/><path d="M17 3v2"/><rect width="4" height="8" x="15" y="5" rx="1"/><path d="M17 13v3"/><path d="M3 3v18h18"/></Icon>;
+        const HistoryIcon = (props) => <Icon {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/></Icon>;
+        const Share2 = (props) => <Icon {...props}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></Icon>;
+        const RotateCw = (props) => <Icon {...props}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 12"/><path d="M21 3v9h-9"/></Icon>;
+        const Lock = (props) => <Icon {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+        const Key = (props) => <Icon {...props}><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4l-3.3 3.3"/><path d="m2 22 2-2"/><path d="m5 19 2-2"/><path d="m8 16 2-2"/><circle cx="15.5" cy="7.5" r="3.5"/></Icon>;
+        const Check = (props) => <Icon {...props}><polyline points="20 6 9 17 4 12"/></Icon>;
+        const Clock = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+        const LogOut = (props) => <Icon {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+        const CopyIcon = (props) => <Icon {...props}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></Icon>;
+
+        // Chart Component
+        const CandleChart = ({ data }) => {
+            if (!data || data.length === 0) return null;
+            let minRaw = Math.min(...data.map(d => d.low));
+            let maxRaw = Math.max(...data.map(d => d.high));
+            const buffer = (maxRaw - minRaw) * 0.1;
+            const minPrice = minRaw - buffer;
+            const maxPrice = maxRaw + buffer;
+            const range = maxPrice - minPrice;
+            const widthPct = 100 / data.length;
+            const lastCandle = data[data.length - 1];
+            const lastPriceY = 100 - ((lastCandle.close - minPrice) / range * 100);
+
+            // Generate Price Levels
+            const priceLevels = [
+                maxPrice,
+                minPrice + (range * 0.75),
+                minPrice + (range * 0.50),
+                minPrice + (range * 0.25),
+                minPrice
+            ];
+
+            return (
+                <div className="absolute inset-0 z-0 overflow-hidden bg-slate-900/40 pointer-events-none flex">
+                    <div className="flex-1 relative h-full">
+                        <svg width="100%" height="100%" className="absolute inset-0 opacity-20">
+                            <line x1="0" y1="0%" x2="100%" y2="0%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            <line x1="0" y1="25%" x2="100%" y2="25%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            <line x1="0" y1="50%" x2="100%" y2="50%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            <line x1="0" y1="75%" x2="100%" y2="75%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            <line x1="0" y1="100%" x2="100%" y2="100%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            {[...Array(5)].map((_, i) => (
+                                <line key={i} x1={`${i*25}%`} y1="0" x2={`${i*25}%`} y2="100%" stroke="gray" strokeWidth="0.5" strokeDasharray="2"/>
+                            ))}
+                        </svg>
+                        <svg width="100%" height="100%" preserveAspectRatio="none" className="opacity-80">
+                            {data.map((d, i) => {
+                                const isGreen = d.close >= d.open;
+                                const color = isGreen ? '#26a69a' : '#ef5350';
+                                const yHigh = 100 - ((d.high - minPrice) / range * 100);
+                                const yLow = 100 - ((d.low - minPrice) / range * 100);
+                                const yOpen = 100 - ((d.open - minPrice) / range * 100);
+                                const yClose = 100 - ((d.close - minPrice) / range * 100);
+                                const rectY = Math.min(yOpen, yClose);
+                                const rectHeight = Math.max(Math.abs(yClose - yOpen), 0.5);
+                                return (
+                                    <g key={i}>
+                                        <line x1={`${(i * widthPct) + (widthPct/2)}%`} y1={`${yHigh}%`} x2={`${(i * widthPct) + (widthPct/2)}%`} y2={`${yLow}%`} stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke"/>
+                                        <rect x={`${(i * widthPct) + (widthPct * 0.15)}%`} y={`${rectY}%`} width={`${widthPct * 0.7}%`} height={`${rectHeight}%`} fill={color} />
+                                    </g>
+                                )
+                            })}
+                            <line x1="0" y1={`${lastPriceY}%`} x2="100%" y2={`${lastPriceY}%`} stroke={lastCandle.close >= lastCandle.open ? '#26a69a' : '#ef5350'} strokeWidth="1" strokeDasharray="4" className="animate-pulse opacity-90"/>
+                        </svg>
+                    </div>
+                    <div className="w-12 relative border-l border-slate-700 bg-slate-900 z-10">
+                        <div className="absolute inset-0 flex flex-col justify-between py-0 text-[9px] font-mono text-slate-400 select-none">
+                            {priceLevels.map((p, i) => (
+                                <div key={i} className="flex items-center justify-end pr-1 h-0 overflow-visible"><span className="bg-slate-900/80 px-0.5">{p.toFixed(0)}</span></div>
+                            ))}
+                        </div>
+                        <div className={`absolute left-0 w-full px-1 py-0.5 text-[9px] font-bold text-white font-mono z-20 transition-all duration-300 text-center flex items-center justify-center ${lastCandle.close >= lastCandle.open ? 'bg-[#26a69a]' : 'bg-[#ef5350]'}`} style={{ top: `calc(${lastPriceY}% - 9px)`, clipPath: 'polygon(10% 0, 100% 0, 100% 100%, 10% 100%, 0 50%)' }}>
+                            {lastCandle.close.toFixed(0)}
+                        </div>
+                        <div className={`absolute left-0 w-1 h-0.5 ${lastCandle.close >= lastCandle.open ? 'bg-[#26a69a]' : 'bg-[#ef5350]'}`} style={{ top: `${lastPriceY}%` }}></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const BitcoinSignalApp = () => {
+            // --- SECURITY / LOGIN STATE ---
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null); // Track logged in user
+            const [daysRemaining, setDaysRemaining] = useState(0); // Track days left
+            
+            // --- NEW LICENSE & DEVICE ID STATES ---
+            const [authMode, setAuthMode] = useState('LOGIN'); // 'LOGIN' or 'ACTIVATE'
+            const [deviceId, setDeviceId] = useState("");
+            const [licenseKeyInput, setLicenseKeyInput] = useState("");
+            const [copySuccess, setCopySuccess] = useState(false);
+
+            // --- ADMIN GENERATOR STATES ---
+            const [genDeviceId, setGenDeviceId] = useState("");
+            const [genUsername, setGenUsername] = useState("");
+            const [genPassword, setGenPassword] = useState("");
+            const [genDays, setGenDays] = useState(30);
+            const [generatedKey, setGeneratedKey] = useState("");
+            const [keyHistory, setKeyHistory] = useState([]); // NEW HISTORY STATE
+            
+            // --- LOGIN & PASSWORD STATES ---
+            const [loginUser, setLoginUser] = useState("");
+            const [loginPass, setLoginPass] = useState("");
+            const [loginError, setLoginError] = useState("");
+            const [rememberMe, setRememberMe] = useState(false); 
+            
+            // --- NEW: FORGOT & CHANGE PASSWORD STATES ---
+            const [isForgotPass, setIsForgotPass] = useState(false);
+            const [resetUser, setResetUser] = useState("");
+            const [masterKeyInput, setMasterKeyInput] = useState("");
+            const [newPassInput, setNewPassInput] = useState("");
+            
+            const [oldPassInput, setOldPassInput] = useState("");
+            const [changePassInput, setChangePassInput] = useState("");
+            const [changePassMsg, setChangePassMsg] = useState(null);
+
+            // --- MANUAL USER CREDENTIALS WITH EXPIRY DATES ---
+            // Format: YYYY-MM-DD
+            const AUTHORIZED_USERS = [
+                { username: "TAYYAB", password: "974995", expiryDate: "2026-02-15" }, 
+                { username: "ADMIN", password: "9749952026", expiryDate: "2099-12-31" }, 
+                { username: "Waqar", password: "Abc@5566786", expiryDate: "2026-02-15" }, 
+                { username: "Khalid", password: "Khalid@123", expiryDate: "2026-04-15" }, 
+                { username: "Aftab", password: "Dubai1122", expiryDate: "2026-02-15" },
+                { username: "Adnan", password: "Abc@1122", expiryDate: "2026-02-23" }, // New User (1 Month Access)
+                { username: "Faisal", password: "Faisal123", expiryDate: "2026-03-05" }, // New User (10 Days Access)
+                { username: "Webify", password: "123456", expiryDate: "2026-03-06" } // Trial 3 Days
+            ];
+
+            // Calculate Days Left Helper
+            const calculateDaysLeft = (expiryStr) => {
+                const today = new Date();
+                const expiry = new Date(expiryStr);
+                const diffTime = expiry - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                return diffDays;
+            };
+
+            // --- ADVANCED LICENSE CRYPTOGRAPHY (RC4 + Checksum + Hex Formatting) ---
+            const SECRET_KEY = "RZ_BTC_PRO_MASTER_KEY_2026_X9!@#"; // Do not share this
+            
+            // RC4 Stream Cipher Algorithm
+            const rc4 = (key, str) => {
+                let s = [], j = 0, x, res = '';
+                for (let i = 0; i < 256; i++) { s[i] = i; }
+                for (let i = 0; i < 256; i++) {
+                    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+                    x = s[i]; s[i] = s[j]; s[j] = x;
+                }
+                let i = 0; j = 0;
+                for (let y = 0; y < str.length; y++) {
+                    i = (i + 1) % 256;
+                    j = (j + s[i]) % 256;
+                    x = s[i]; s[i] = s[j]; s[j] = x;
+                    res += String.fromCharCode(str.charCodeAt(y) ^ s[(s[i] + s[j]) % 256]);
+                }
+                return res;
+            };
+
+            // String to Hex
+            const toHex = (str) => Array.from(str).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+            
+            // Hex to String
+            const fromHex = (hex) => {
+                let str = '';
+                for (let i = 0; i < hex.length; i += 2) str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+                return str;
+            };
+
+            // Tamper-Proof Checksum Generator
+            const generateChecksum = (str) => {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                    hash |= 0; 
+                }
+                return Math.abs(hash).toString(16).padStart(8, '0');
+            };
+
+            const encryptLicense = (data) => {
+                const payload = JSON.stringify(data);
+                const checksum = generateChecksum(payload);
+                // Attach checksum before encryption to verify integrity later
+                const fullData = checksum + "|" + payload;
+                const encrypted = rc4(SECRET_KEY, fullData);
+                const hex = toHex(encrypted).toUpperCase();
+                // Format as professional segments: XXXXXXXX-XXXXXXXX-XXXXXXXX...
+                return hex.match(/.{1,8}/g)?.join('-') || hex;
+            };
+
+            const decryptLicense = (key) => {
+                try {
+                    const cleanHex = key.replace(/-/g, '').toLowerCase();
+                    const decrypted = rc4(SECRET_KEY, fromHex(cleanHex));
+                    const delimiterIndex = decrypted.indexOf('|');
+                    
+                    if (delimiterIndex === -1) return null; // Corrupted key
+                    
+                    const checksum = decrypted.substring(0, delimiterIndex);
+                    const payload = decrypted.substring(delimiterIndex + 1);
+                    
+                    // Verify Integrity (If someone modified the hex, checksum will fail)
+                    if (generateChecksum(payload) !== checksum) return null; 
+                    
+                    return JSON.parse(payload);
+                } catch(e) { 
+                    return null; // Handle any decode errors silently
+                }
+            };
+
+            const copyToClipboard = (text) => {
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                setCopySuccess(true);
+                setTimeout(() => setCopySuccess(false), 2000);
+            };
+
+            // Check Local Storage on Mount & Initialize Device ID
+            useEffect(() => {
+                try {
+                    // Load Key History for Admin
+                    const hist = localStorage.getItem('btc_admin_key_history');
+                    if (hist) setKeyHistory(JSON.parse(hist));
+
+                    // 1. Setup Device ID
+                    let did = localStorage.getItem('btc_device_id');
+                    if (!did) {
+                        did = 'BTC-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+                        localStorage.setItem('btc_device_id', did);
+                    }
+                    setDeviceId(did);
+
+                    // 2. Check for Active License on this Device
+                    const activeLicStr = localStorage.getItem('btc_active_license');
+                    if (activeLicStr) {
+                        const lic = decryptLicense(activeLicStr);
+                        if (lic && lic.did === did) {
+                            const days = calculateDaysLeft(lic.exp);
+                            if (days >= 0) {
+                                setCurrentUser(lic.u);
+                                setDaysRemaining(days);
+                                setIsAuthenticated(true);
+                            } else {
+                                localStorage.removeItem('btc_active_license'); // Expired
+                            }
+                        }
+                    } else {
+                        // 3. Fallback to Master Admin Auto-Login if Remembered
+                        const savedUser = localStorage.getItem('btc_app_user');
+                        if (savedUser) {
+                            const userObj = AUTHORIZED_USERS.find(u => u.username.toUpperCase() === savedUser.toUpperCase());
+                            if(userObj) {
+                                const days = calculateDaysLeft(userObj.expiryDate);
+                                if (days >= 0) {
+                                    setCurrentUser(userObj.username);
+                                    setDaysRemaining(days);
+                                    setIsAuthenticated(true);
+                                } else {
+                                    localStorage.removeItem('btc_app_user');
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log("Local storage not available");
+                }
+            }, []);
+
+            // Handle Subscription Click (Select App Logic)
+            const handleSubscription = async () => {
+                const subMessage = 
+`Hello Reezoon Trading Group! 👋
+
+I want to subscribe to *BTC Live Trader Pro* app.
+
+🔥 *App Features:*
+• Live Buy/Sell Signals 🎯
+• Technical Analysis (Urdu) 📝
+• Fundamental News & Impact 🌍
+• Auto-WhatsApp Alerts 🚀
+
+💎 *Subscription Plans:*
+• 1 Week: $20
+• 1 Month: $50
+• 6 Months: $299
+• Lifetime: Contact Admin
+
+Please send me payment details for activation.
+Admin Contact: +971 52 117 1940`;
+
+                // Direct Chat Link (Only for fallback)
+                const subUrl = `https://wa.me/971521171940?text=${encodeURIComponent(subMessage)}`;
+
+                // Use Native Share (System Drawer) to allow picking WhatsApp vs WhatsApp Business
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'Get Subscription',
+                            text: subMessage
+                            // URL removed to prevent "big link" preview
+                        });
+                    } catch (err) {
+                        console.log('Share cancelled, opening direct link');
+                        // Optional: Fallback to window.open if share fails, but often better to do nothing if user cancelled
+                    }
+                } else {
+                    window.open(subUrl, '_blank');
+                }
+            };
+
+            // LOGOUT FUNCTION
+            const handleLogout = () => {
+                if(confirm("Kya aap waqai Logout karna chahte hain?")) {
+                    setIsAuthenticated(false);
+                    setCurrentUser(null);
+                    setDaysRemaining(0);
+                    // Remove from local storage
+                    try {
+                        localStorage.removeItem('btc_app_user');
+                    } catch (e) {}
+                    // Reset View
+                    setActiveModal(null);
+                }
+            };
+
+            // --- NEW: HANDLE CHANGE PASSWORD (INSIDE SETTINGS) ---
+            const handleChangePassword = () => {
+                let customPassMap = {};
+                try { customPassMap = JSON.parse(localStorage.getItem('btc_custom_passwords')) || {}; } catch(e){}
+                
+                // Determine current actual password
+                let currentActualPass = null;
+                const activeLicStr = localStorage.getItem('btc_active_license');
+                if (activeLicStr) {
+                    const lic = decryptLicense(activeLicStr);
+                    if (lic && lic.u.toUpperCase() === currentUser.toUpperCase()) {
+                        currentActualPass = lic.p;
+                    }
+                }
+                if (!currentActualPass) {
+                    const validUser = AUTHORIZED_USERS.find(u => u.username.toUpperCase() === currentUser.toUpperCase());
+                    if (validUser) currentActualPass = validUser.password;
+                }
+                
+                const activePass = customPassMap[currentUser.toUpperCase()] || currentActualPass;
+
+                if (oldPassInput !== activePass) {
+                    setChangePassMsg({ text: "Old password incorrect!", type: "error" });
+                    return;
+                }
+                if (changePassInput.length < 4) {
+                    setChangePassMsg({ text: "New password too short!", type: "error" });
+                    return;
+                }
+
+                customPassMap[currentUser.toUpperCase()] = changePassInput;
+                localStorage.setItem('btc_custom_passwords', JSON.stringify(customPassMap));
+                setChangePassMsg({ text: "Password changed successfully!", type: "success" });
+                setOldPassInput("");
+                setChangePassInput("");
+                setTimeout(() => setChangePassMsg(null), 3000);
+            };
+
+            // --- NEW: HANDLE MASTER KEY PASSWORD RESET ---
+            const handleResetPassword = (e) => {
+                e.preventDefault();
+                // ONLY ADMIN HAS THIS MASTER KEY
+                if (masterKeyInput !== "974995tayyab2026") {
+                    setLoginError("Invalid Master Key!");
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    return;
+                }
+                if (!resetUser || newPassInput.length < 4) {
+                    setLoginError("Invalid Username or Password too short.");
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    return;
+                }
+
+                let customPassMap = {};
+                try { customPassMap = JSON.parse(localStorage.getItem('btc_custom_passwords')) || {}; } catch(e){}
+                
+                customPassMap[resetUser.toUpperCase()] = newPassInput;
+                localStorage.setItem('btc_custom_passwords', JSON.stringify(customPassMap));
+                
+                setLoginError("Password Reset Successful! You can now login.");
+                setIsForgotPass(false);
+                setLoginUser(resetUser);
+                setLoginPass(newPassInput);
+                setResetUser("");
+                setMasterKeyInput("");
+                setNewPassInput("");
+            };
+
+            // --- NEW: HANDLE LICENSE ACTIVATION ---
+            const handleActivate = (e) => {
+                e.preventDefault();
+
+                const data = decryptLicense(licenseKeyInput.trim());
+                if (!data) {
+                    setLoginError("Invalid License Key Format!");
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    return;
+                }
+                
+                if (data.did !== deviceId) {
+                    setLoginError("License Key is registered to a different Device ID!");
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    return;
+                }
+                
+                const days = calculateDaysLeft(data.exp);
+                if (days < 0) {
+                    setLoginError(`License Expired on ${data.exp}!`);
+                    if (navigator.vibrate) navigator.vibrate(200);
+                    return;
+                }
+
+                // Success! Save License & Login
+                try {
+                    localStorage.setItem('btc_active_license', encryptLicense(data));
+                } catch (err) {}
+                
+                setCurrentUser(data.u);
+                setDaysRemaining(days);
+                setIsAuthenticated(true);
+                setLoginError("");
+            };
+
+            // --- MODIFIED: HANDLE LOGIN (Checks Local License OR Master Auth) ---
+            const handleLogin = (e) => {
+                e.preventDefault();
+                
+                // Load Custom Passwords (Overrides default ones if changed)
+                let customPassMap = {};
+                try { customPassMap = JSON.parse(localStorage.getItem('btc_custom_passwords')) || {}; } catch(e){}
+                const overriddenPass = customPassMap[loginUser.toUpperCase()] || null;
+                
+                // 1. Check against activated local license first
+                const activeLicStr = localStorage.getItem('btc_active_license');
+                if (activeLicStr) {
+                    const lic = decryptLicense(activeLicStr);
+                    const validPass = overriddenPass || lic.p;
+                    if (lic && lic.u.toUpperCase() === loginUser.toUpperCase() && validPass === loginPass) {
+                        const days = calculateDaysLeft(lic.exp);
+                        if (days < 0) {
+                            setLoginError("Your device license has expired! Please activate a new key.");
+                            if (navigator.vibrate) navigator.vibrate(200);
+                            return;
+                        }
+                        setCurrentUser(lic.u);
+                        setDaysRemaining(days);
+                        setIsAuthenticated(true);
+                        setLoginError("");
+                        if (rememberMe) localStorage.setItem('btc_app_user', lic.u);
+                        return;
+                    }
+                }
+
+                // 2. Fallback check against hardcoded Master Admin accounts
+                const validUser = AUTHORIZED_USERS.find(u => u.username.toUpperCase() === loginUser.toUpperCase());
+
+                if (validUser) {
+                    const validPass = overriddenPass || validUser.password;
+                    if (validPass === loginPass) {
+                        const days = calculateDaysLeft(validUser.expiryDate);
+                        if (days < 0) {
+                            setLoginError("Master Subscription Expired! Please renew.");
+                            if (navigator.vibrate) navigator.vibrate(200);
+                            return;
+                        }
+                        setIsAuthenticated(true);
+                        setCurrentUser(validUser.username);
+                        setDaysRemaining(days);
+                        setLoginError("");
+                        try {
+                            if (rememberMe) localStorage.setItem('btc_app_user', validUser.username);
+                        } catch (e) {}
+                        return;
+                    }
+                } 
+                
+                setLoginError("Invalid Username/Password OR Device not Activated.");
+                if (navigator.vibrate) navigator.vibrate(200);
+            };
+
+            // --- ADMIN: GENERATE KEY FUNCTION ---
+            const handleGenerateKey = () => {
+                if(!genDeviceId || !genUsername || !genPassword || !genDays) return;
+                const expDate = new Date();
+                expDate.setDate(expDate.getDate() + parseInt(genDays));
+                
+                const data = {
+                    u: genUsername,
+                    p: genPassword,
+                    exp: expDate.toISOString().split('T')[0],
+                    did: genDeviceId
+                };
+                
+                const newKey = encryptLicense(data);
+                setGeneratedKey(newKey);
+                
+                // Save to history
+                const historyItem = {
+                    did: genDeviceId,
+                    user: genUsername,
+                    days: genDays,
+                    exp: data.exp,
+                    key: newKey,
+                    date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
+                };
+                
+                const updatedHistory = [historyItem, ...keyHistory].slice(0, 50); // Keep last 50
+                setKeyHistory(updatedHistory);
+                try {
+                    localStorage.setItem('btc_admin_key_history', JSON.stringify(updatedHistory));
+                } catch(e) {}
+            };
+
+            const clearKeyHistory = () => {
+                if(confirm("Kya aap waqai license history delete karna chahte hain?")) {
+                    setKeyHistory([]);
+                    try { localStorage.removeItem('btc_admin_key_history'); } catch(e) {}
+                }
+            };
+            
+            // --- APP STATE ---
+            const [price, setPrice] = useState(null);
+            const [priceChange, setPriceChange] = useState(0);
+            const [high24h, setHigh24h] = useState(0);
+            const [low24h, setLow24h] = useState(0);
+            const [signal, setSignal] = useState({ text: "WAITING", type: "WAIT", urdu: "Market data load ho raha hai...", leaderText: "ANALYZING..." });
+            const [funSignal, setFunSignal] = useState({ text: "NEUTRAL", type: "NEUTRAL", urdu: "News ka asar neutral hai.", leaderText: "NO BIAS" }); 
+            const [rsi, setRsi] = useState(50);
+            const [levels, setLevels] = useState({ support: 0, resistance: 0, demandZone: {high: 0, low: 0}, supplyZone: {high: 0, low: 0} });
+            const levelsRef = useRef(levels);
+            const [chartData, setChartData] = useState([]);
+            const chartDataRef = useRef([]); 
+            const [connectionStatus, setConnectionStatus] = useState("Disconnected");
+            const [flashClass, setFlashClass] = useState("");
+            const [trendInfo, setTrendInfo] = useState({ label: "NEUTRAL", sentiment: "Quiet" });
+            const [sessionData, setSessionData] = useState({ active: [], details: [], statusText: "Loading...", statusColor: "text-slate-400", isWeekend: false, utcTime: "" });
+            const [newsData, setNewsData] = useState({ calendar: [], headlines: [], etf: { list: [], total: 0, sentiment: "Neutral" }, etfNews: [] });
+            const [signalHistory, setSignalHistory] = useState([]); 
+            const [selectedHistoryItem, setSelectedHistoryItem] = useState(null); 
+            const [isLandscape, setIsLandscape] = useState(false); 
+
+            // Modals
+            const [activeModal, setActiveModal] = useState(null);
+            const [selectedNews, setSelectedNews] = useState(null);
+            const [activeNewsTab, setActiveNewsTab] = useState("calendar");
+            const [newsFilterImpact, setNewsFilterImpact] = useState("HIGH");
+            const [newsFilterTime, setNewsFilterTime] = useState("TODAY");
+            const [priceOffset, setPriceOffset] = useState(0);
+            const [minGap, setMinGap] = useState(1000); 
+            const [autoShare, setAutoShare] = useState(false); 
+            const [activeSettingsTab, setActiveSettingsTab] = useState('security'); // NEW: Settings Tab State
+            
+            const minGapRef = useRef(1000);
+            const autoShareRef = useRef(false); 
+            const lastAutoSentSignalRef = useRef(null); 
+            
+            const [now, setNow] = useState(new Date());
+            
+            // Notifications
+            const [notification, setNotification] = useState(null);
+            const lastZoneRef = useRef('mid'); 
+            const alertedEventsRef = useRef(new Set()); 
+
+            const ws = useRef(null);
+            const prevPrice = useRef(0);
+
+            // --- AUTO SHARE FIX ---
+            // Save/Load Auto Share Setting
+            useEffect(() => {
+                const savedAuto = localStorage.getItem('autoShare');
+                if (savedAuto) {
+                    const isTrue = savedAuto === 'true';
+                    setAutoShare(isTrue);
+                    autoShareRef.current = isTrue;
+                }
+            }, []);
+
+            const toggleAutoShare = () => {
+                const newVal = !autoShare;
+                setAutoShare(newVal);
+                autoShareRef.current = newVal;
+                localStorage.setItem('autoShare', newVal);
+            };
+
+            // --- BACK BUTTON HANDLING (MOBILE NAVIGATION) ---
+            useEffect(() => {
+                if (activeModal || selectedNews || selectedHistoryItem) {
+                    window.history.pushState({ modalOpen: true }, "");
+                }
+
+                const handlePopState = () => {
+                    if (activeModal || selectedNews || selectedHistoryItem) {
+                        setActiveModal(null);
+                        setSelectedNews(null);
+                        setSelectedHistoryItem(null);
+                        setIsLandscape(false); 
+                    }
+                };
+
+                window.addEventListener('popstate', handlePopState);
+
+                return () => {
+                    window.removeEventListener('popstate', handlePopState);
+                };
+            }, [activeModal, selectedNews, selectedHistoryItem]);
+
+            // AI Urdu Analysis Generator
+            const generateUrduAnalysis = (title, body, impact, actual, forecast) => {
+                const lowerTitle = title.toLowerCase();
+                let analysis = "";
+                let sentiment = "Neutral";
+
+                // 1. DATA DRIVEN ANALYSIS (Economic Calendar)
+                if (actual && forecast) {
+                    const actVal = parseFloat(actual);
+                    const fcstVal = parseFloat(forecast);
+                    
+                    if (!isNaN(actVal) && !isNaN(fcstVal)) {
+                        if (lowerTitle.includes("cpi") || lowerTitle.includes("inflation")) {
+                            if (actVal > fcstVal) {
+                                analysis = `Mehengai ka data (${actual}) Forecast (${forecast}) se zyada aya hai. Yeh Dollar ke liye Bullish aur BTC ke liye 🔴 BEARISH hai. Rate hike ka khatra barh gaya hai.`;
+                                sentiment = "Bearish";
+                            } else {
+                                analysis = `Mehengai ka data (${actual}) umeed se kam aya hai. Yeh BTC ke liye 🟢 BULLISH sign hai kyunki Dollar weak ho sakta hai.`;
+                                sentiment = "Bullish";
+                            }
+                        } else if (lowerTitle.includes("nfp") || lowerTitle.includes("employment")) {
+                            if (actVal > fcstVal) {
+                                analysis = `Jobs ka data zabardast aya hai (${actual}). Economy strong hai, Dollar strong hoga aur BTC 🔴 GIR sakta hai.`;
+                                sentiment = "Bearish";
+                            } else {
+                                analysis = `Jobs data kamzor aya hai. Dollar weak hoga aur BTC 🟢 UPAR ja sakta hai.`;
+                                sentiment = "Bullish";
+                            }
+                        } else if (lowerTitle.includes("rate") || lowerTitle.includes("fomc")) {
+                            analysis = `Interest Rate ka faisla market ko volatile karega. Agar rate barhaya gaya to BTC 🔴 DUMP hoga. Agar rate same raha ya kam hua to 🟢 PUMP hoga.`;
+                            sentiment = "Critical";
+                        }
+                    }
+                } 
+                
+                // 2. HEADLINE / CONTEXTUAL ANALYSIS
+                if (!analysis) {
+                    if (lowerTitle.includes("war") || lowerTitle.includes("missile") || lowerTitle.includes("conflict") || lowerTitle.includes("israel") || lowerTitle.includes("iran") || lowerTitle.includes("russia")) {
+                        analysis = "Geopolitical tension market mein Uncertainty laati hai. Investors safe assets (Gold/Dollar) mein ja sakte hain. BTC temporarily 🔴 DOWN ja sakta hai.";
+                        sentiment = "Bearish";
+                    }
+                    else if ((lowerTitle.includes("binance") || lowerTitle.includes("coinbase")) && lowerTitle.includes("outflow")) {
+                        analysis = "Exchange se bhaari Outflow ka matlab hai Whales buying kar ke cold wallet mein le ja rahe hain. Ye supply shock aur 🟢 BULLISH sign hai.";
+                        sentiment = "Bullish";
+                    }
+                    else if ((lowerTitle.includes("binance") || lowerTitle.includes("coinbase")) && lowerTitle.includes("inflow")) {
+                        analysis = "Exchange par Inflow barh raha hai. Iska matlab investors bechnay (Sell) ke liye coins la rahe hain. 🔴 DUMP ka khatra hai.";
+                        sentiment = "Bearish";
+                    }
+                    else if (lowerTitle.includes("etf") || lowerTitle.includes("blackrock") || lowerTitle.includes("fidelity") || lowerTitle.includes("flows")) {
+                        analysis = "Institutional money ka flow! Agar Inflow ki khabar hai to BTC 🟢 BUY karein. Smart money market mein aa raha hai.";
+                        sentiment = "Institutional";
+                    } 
+                    else if (lowerTitle.includes("sec") || lowerTitle.includes("lawsuit") || lowerTitle.includes("sued") || lowerTitle.includes("ban")) {
+                        analysis = "Regulatory news aksar FUD (Fear) failati hain. Panic selling aa sakti hai. 🔴 SHORT positions par nazar rakhein.";
+                        sentiment = "Bearish";
+                    }
+                    else if (lowerTitle.includes("approval") || lowerTitle.includes("won") || lowerTitle.includes("settlement")) {
+                        analysis = "Regulatory clarity milna market ke liye acha hai. Legal jeet ya approval se price 🟢 PUMP ho sakti hai.";
+                        sentiment = "Bullish";
+                    }
+                    else if (lowerTitle.includes("fed") || lowerTitle.includes("powell") || lowerTitle.includes("rate")) {
+                        analysis = "Fed/Interest rates ki khabar Dollar (DXY) par asar daalti hai. Agar Hawkish (sakht) news hai to BTC GIREGA. Agar Dovish (naram) hai to BTC UTHAY GA.";
+                        sentiment = "Neutral";
+                    } 
+                    else if (lowerTitle.includes("surge") || lowerTitle.includes("soar") || lowerTitle.includes("record") || lowerTitle.includes("ath") || lowerTitle.includes("rally")) {
+                        analysis = "Market Sentiment positive hai. FOMO buying aa sakti hai. 🟢 Long trades dhundein.";
+                        sentiment = "Bullish";
+                    } 
+                    else if (lowerTitle.includes("crash") || lowerTitle.includes("plunge") || lowerTitle.includes("dump") || lowerTitle.includes("sell")) {
+                        analysis = "Panic selling ho rahi hai. Support levels toot sakte hain. 🔴 Short trades dhundein.";
+                        sentiment = "Bearish";
+                    } 
+                    else if (lowerTitle.includes("hack") || lowerTitle.includes("exploit") || lowerTitle.includes("stolen")) {
+                         analysis = "Negative news! Security breach ki wajah se coin dump ho sakta hai. Foran exit karein ya Short karein.";
+                         sentiment = "Bearish";
+                    } else {
+                         analysis = "Is khabar ka asar market par mixed ho sakta hai. Price Action aur Technical Levels (Support/Resistance) ko dekh kar trade lein.";
+                         sentiment = "Neutral";
+                    }
+                }
+                
+                return { text: analysis, sentiment: sentiment };
+            };
+
+            // Fetch Levels Logic
+            const fetchLevels = async () => {
+                try {
+                    const response = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=60');
+                    const data = await response.json();
+                    if (!data || data.length === 0) return;
+                    let formattedData = [];
+                    let highest = -Infinity, lowest = Infinity;
+                    let supplyCandle = { high: 0, low: 0 }, demandCandle = { high: 0, low: 0 };
+                    data.forEach(c => {
+                        const open = parseFloat(c[1]), high = parseFloat(c[2]), low = parseFloat(c[3]), close = parseFloat(c[4]);
+                        if (high > highest) { highest = high; supplyCandle = {high, low}; }
+                        if (low < lowest) { lowest = low; demandCandle = {high, low}; }
+                        formattedData.push({ open, high, low, close });
+                    });
+                    const newLevels = { support: lowest, resistance: highest, demandZone: demandCandle || {high:0,low:0}, supplyZone: supplyCandle || {high:0,low:0} };
+                    setLevels(newLevels);
+                    levelsRef.current = newLevels;
+                    setChartData(formattedData.slice(-40));
+                    setRsi(Math.round(computeRSI(formattedData.map(d=>d.close))));
+                } catch (e) { console.error(e); }
+            };
+
+            const computeRSI = (closes, period=14) => {
+                if (closes.length < period + 1) return 50;
+                let gains=0, losses=0;
+                for(let i=1; i<=period; i++) { const chg = closes[i]-closes[i-1]; if(chg>0) gains+=chg; else losses+=Math.abs(chg); }
+                let avgGain = gains/period, avgLoss = losses/period;
+                for(let i=period+1; i<closes.length; i++) { const chg = closes[i]-closes[i-1]; let g = chg>0?chg:0, l=chg<0?Math.abs(chg):0; avgGain=((avgGain*(period-1))+g)/period; avgLoss=((avgLoss*(period-1))+l)/period; }
+                return avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+            };
+
+            const determineSignal = (currentPrice) => {
+                const lvls = levelsRef.current;
+                if (!lvls.support || !lvls.resistance) return { text: "WAITING", type: "WAIT", urdu: "Market data load ho raha hai...", leaderText: "ANALYZING..." };
+
+                const rangeSize = lvls.resistance - lvls.support;
+                const minGapVal = minGapRef.current; 
+                if (rangeSize < minGapVal) return { 
+                    text: `NO TRADE (Range < ${minGapVal})`, 
+                    type: "HOLD_TIGHT",
+                    leaderText: "🚫 NO TRADE",
+                    urdu: `Team, Market is waqt bohot tang range (${rangeSize.toFixed(0)} points) mein phassi hui hai. Hamein kam az kam ${minGapVal} points ka gap chahiye. Abhi trade karna risky hai, behtar hai ke wait karein.`
+                };
+
+                const demandHigh = lvls.demandZone.high;
+                const supplyLow = lvls.supplyZone.low;
+                const range = supplyLow - demandHigh;
+                const buffer = range * 0.20; 
+                
+                if (currentPrice <= demandHigh) return { 
+                    text: "BUY (Demand Zone)", type: "BUY",
+                    leaderText: "✅ ENTER LONG",
+                    urdu: `Team, Market is waqt **Demand Zone** ($${Math.floor(demandHigh)}) mein enter ho chuki hai. RSI oversold area se recover kar raha hai jo ek strong reversal sign hai. Ye **Long Position** (Buy) open karne ka behtareen waqt hai. Stop loss zone ke neeche rakhein.`
+                };
+                if (currentPrice >= supplyLow) return { 
+                    text: "SELL (Supply Zone)", type: "SELL",
+                    leaderText: "✅ ENTER SHORT",
+                    urdu: `Team, Market **Supply Zone** ($${Math.floor(supplyLow)}) mein enter ho chuki hai. RSI overbought area mein hai jo rejection ka ishara de raha hai. Ye **Short Position** (Sell) lene ka perfect mauqa hai. Stop loss zone ke upar rakhein.`
+                };
+                
+                if (currentPrice <= demandHigh + buffer) return { 
+                    text: "Ready to BUY 🟢", type: "PREP_BUY",
+                    leaderText: "👀 WATCH BUY",
+                    waitPrice: demandHigh,
+                    urdu: `Alert! Price Support ke bohot qareeb aa chuki hai. Market par nazar rakhein. Behtar hai ke price ko $${Math.floor(demandHigh)} tak aanay dein, phir Buy karein.`
+                };
+                if (currentPrice >= supplyLow - buffer) return { 
+                    text: "Ready to SELL 🔴", type: "PREP_SELL",
+                    leaderText: "👀 WATCH SELL",
+                    waitPrice: supplyLow,
+                    urdu: `Alert! Price Resistance ke qareeb ja rahi hai. Short trade ke liye tayyar rahain. Price ka $${Math.floor(supplyLow)} tak wait karein, phir rejection par Sell karein.`
+                };
+                
+                return { 
+                    text: "HOLD (Sideways)", type: "HOLD",
+                    leaderText: "✋ HOLD / WAIT",
+                    urdu: "Market abhi beech mein (No Man's Land) hai. Na Support par hai na Resistance par. Yahan trade lena gambling hai. Behtar hai ke price ko kisi zone tak aane dein."
+                };
+            };
+
+            const determineFunSignal = (changePct, etfSentiment) => {
+                let score = 0;
+                let urduText = "News mixed hain.";
+                let leaderText = "MIXED DATA";
+                
+                if (changePct > 0.5) score++;
+                if (changePct < -0.5) score--;
+                
+                if (etfSentiment && etfSentiment.includes("Bullish")) score++;
+                if (etfSentiment && etfSentiment.includes("Bearish")) score--;
+
+                if (score > 0) {
+                    urduText = "Team, Fundamental Data **Strongly Bullish** hai. Institutions (ETF) mein paisa aa raha hai aur global news bhi positive hain. Trend upar ki taraf hai, isliye **Long (Buy)** trades ko priority dein.";
+                    leaderText = "🚀 POSITIVE FLOW";
+                    return { text: "NEWS BULLISH 🐂", type: "BUY", urdu: urduText, leaderText: leaderText };
+                }
+                if (score < 0) {
+                    urduText = "Team, Fundamental Data **Bearish** hai. Institutions selling kar rahe hain ya koi negative news market ko neeche dhakel rahi hai. Trend neeche ka hai, **Short (Sell)** trades par focus karein.";
+                    leaderText = "🩸 NEGATIVE FLOW";
+                    return { text: "NEWS BEARISH 🐻", type: "SELL", urdu: urduText, leaderText: leaderText };
+                }
+                
+                return { text: "NEWS MIXED ⚖️", type: "HOLD", urdu: "Team, Filhal koi clear direction nahi hai. News mixed hain. Sirf Technical levels (Support/Resistance) ko follow karein aur choti trades lein.", leaderText: "⚖️ NEUTRAL FLOW" };
+            };
+
+            const generateETFData = (changePct) => { 
+                const baseFlows = [ {t:"IBIT", n:"BlackRock", v:120}, {t:"FBTC", n:"Fidelity", v:80}, {t:"GBTC", n:"Grayscale", v:-50}, {t:"ARKB", n:"Ark", v:25} ]; 
+                const sentiment = changePct * 50; 
+                const list = baseFlows.map(e => ({...e, flow: Math.round(e.v + sentiment + (Math.random()*20-10))})); 
+                const total = list.reduce((a,b)=>a+b.flow,0); 
+                const sentText = total>100?"Strong Bullish":total>0?"Bullish":total<-100?"Strong Bearish":"Bearish"; 
+                setNewsData(prev => ({...prev, etf: {list, total, sentiment: sentText}})); 
+                setFunSignal(determineFunSignal(changePct, sentText));
+            };
+
+            const generateEconomicCalendar = () => { const today = new Date(); const m = today.getMonth(), y = today.getFullYear(), d = today.getDate(); const getRelDate = (offsetDays, hour) => { const dt = new Date(); dt.setDate(dt.getDate() + offsetDays); dt.setHours(hour, 30, 0, 0); return dt; }; const events = [ { title: "CPI Data (YoY)", currency: "USD", impact: "High", fcst: "3.1%", prev: "3.0%", eventDate: getRelDate(0, 13), flag: "🇺🇸" }, { title: "Fed Speech", currency: "USD", impact: "Medium", fcst: "-", prev: "-", eventDate: getRelDate(0, 15), flag: "🇺🇸" }, { title: "NFP Payrolls", currency: "USD", impact: "High", fcst: "180K", prev: "150K", eventDate: getRelDate(1, 13), flag: "🇺🇸" }, { title: "ECB Rate", currency: "EUR", impact: "High", fcst: "4.0%", prev: "4.0%", eventDate: getRelDate(2, 12), flag: "🇪🇺" } ]; const processed = events.map(e => { const analysis = generateUrduAnalysis(e.title, "", e.impact, null, e.fcst); return { ...e, isPassed: e.eventDate < new Date(), displayTime: e.eventDate.toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}), urduAnalysis: analysis }; }).sort((a,b)=>a.eventDate-b.eventDate); setNewsData(prev => ({...prev, calendar: processed})); };
+            const fetchLiveNews = async () => { try { const res = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN'); const json = await res.json(); if(json.Data) { const enriched = json.Data.slice(0, 10).map(item => ({ ...item, urdu: generateUrduAnalysis(item.title, item.body), displayTime: new Date(item.published_on * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) })); setNewsData(prev => ({...prev, headlines: enriched})); } const etfRes = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=ETF,Regulation'); const etfJson = await etfRes.json(); if(etfJson.Data) setNewsData(prev => ({...prev, etfNews: etfJson.Data.slice(0, 5)})); } catch(e) {} };
+            const getFilteredCalendar = () => { let filtered = newsData.calendar; if (newsFilterImpact !== 'ALL') filtered = filtered.filter(n => n.impact.toUpperCase() === newsFilterImpact); const todayStr = new Date().toDateString(); const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1); const tmrwStr = tomorrow.toDateString(); if (newsFilterTime === 'TODAY') filtered = filtered.filter(n => new Date(n.eventDate).toDateString() === todayStr); else if (newsFilterTime === 'TOMORROW') filtered = filtered.filter(n => new Date(n.eventDate).toDateString() === tmrwStr); return filtered; };
+            const getCountdown = (targetDate) => { const diff = targetDate - now; if (diff <= 0) return "Released"; const days = Math.floor(diff / (1000 * 60 * 60 * 24)); const hrs = Math.floor((diff / (1000 * 60 * 60)) % 24); const mins = Math.floor((diff / (1000 * 60)) % 60); const secs = Math.floor((diff / 1000) % 60); if (days > 0) return `${days}d ${hrs}h`; return `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`; };
+            
+            // Professional WhatsApp Sharing Function
+            const shareSignalToWhatsapp = async (isAuto = false, customSignal = null, customPrice = null) => {
+                const currentPrice = customPrice || price;
+                const currentSignal = customSignal || signal;
+
+                if (!currentPrice) return;
+                
+                const emoji = currentSignal.type === 'BUY' ? '🟢' : currentSignal.type === 'SELL' ? '🔴' : '⚠️';
+                const timestamp = new Date().toLocaleString();
+                
+                const message = 
+`💎 *BTC VIP SIGNAL ALERT* 💎
+──────────────────
+🚀 *ACTION:* ${currentSignal.leaderText} ${emoji}
+💰 *PRICE:* $${currentPrice.toFixed(0)}
+📊 *TREND:* ${trendInfo.label}
+──────────────────
+📝 *TECHNICAL ANALYSIS:*
+${currentSignal.urdu}
+──────────────────
+⏰ *TIME:* ${timestamp}
+👨‍💻 *ADMIN:* Tayyab
+🏢 *GROUP:* Reezoon Trading Group
+📱 *SOURCE:* BTC Live Trader Pro
+──────────────────
+⚠️ *DISCLAIMER:*
+Trade with proper risk management. Use Stoploss.`;
+
+                // If Auto Mode: Bypass navigator.share (requires gesture) and try window.open
+                if (isAuto) {
+                    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    // Play Sound
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.play().catch(e=>console.log(e));
+                    
+                    // Try to open
+                    const win = window.open(url, '_blank');
+                    if (!win) {
+                        setNotification({ msg: "⚠️ Auto-WhatsApp Blocked! Click here to send.", type: "sell" }); // Reuse notification for alert
+                    }
+                    return;
+                }
+
+                // Manual Click Mode
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'BTC Signal Alert',
+                            text: message
+                        });
+                        return;
+                    } catch (err) {
+                        console.log('Share cancelled or failed', err);
+                    }
+                } else {
+                    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    window.open(url, '_blank');
+                }
+            };
+
+            // History Sharing Function
+            const shareHistoryItemToWhatsapp = async (item) => {
+                if (!item) return;
+                const emoji = item.type === 'BUY' ? '🟢' : item.type === 'SELL' ? '🔴' : '⚠️';
+                const timestamp = item.time.toLocaleString();
+
+                const message = 
+`📂 *BTC SIGNAL HISTORY* 📂
+──────────────────
+📌 *RECORD:* ${item.leaderText} ${emoji}
+💵 *TRIGGER:* $${item.price.toFixed(0)}
+──────────────────
+📝 *LOGIC:*
+${item.urdu}
+──────────────────
+⏰ *TIME:* ${timestamp}
+👨‍💻 *ADMIN:* Tayyab
+🏢 *GROUP:* Reezoon Trading Group
+📱 *APP:* BTC Live Trader Pro
+──────────────────
+⚠️ *NOTE:* Historical Record.`;
+
+                // Use Native Share API if available
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'BTC History Record',
+                            text: message
+                        });
+                        return;
+                    } catch (err) {
+                        console.log('Share cancelled or failed', err);
+                    }
+                } else {
+                    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    window.open(url, '_blank');
+                }
+            };
+
+            const updateSessions = () => {
+                const d = new Date();
+                const uH = d.getUTCHours(), uM = d.getUTCMinutes(), uS = d.getUTCSeconds();
+                const s = [ {n:"Sydney",s:21,e:6,c:"text-yellow-400",code:"SYD",id:1}, {n:"Tokyo",s:0,e:9,c:"text-cyan-400",code:"TKY",id:2}, {n:"Frankfurt",s:7,e:16,c:"text-orange-400",code:"FRA",id:3}, {n:"London",s:8,e:17,c:"text-purple-400",code:"LDN",id:4}, {n:"New York",s:13,e:22,c:"text-green-400",code:"NYC",id:5} ];
+                const active = [], details = s.map(se => {
+                    let isOpen = false;
+                    let currentSecs = uH * 3600 + uM * 60 + uS;
+                    let startSecs = se.s * 3600;
+                    let endSecs = se.e * 3600;
+                    if (se.s > se.e) { if (currentSecs >= startSecs || currentSecs < endSecs) isOpen = true; } 
+                    else { if (currentSecs >= startSecs && currentSecs < endSecs) isOpen = true; }
+                    const day = d.getUTCDay(); const isWeekend = (day === 6 || day === 0);
+                    let prog = 0, msg = "";
+                    let sessionIsOpen = isOpen && !isWeekend;
+                    if (sessionIsOpen) {
+                        active.push(se.code);
+                        let totalDur = (se.s > se.e) ? ((24 - se.s) + se.e) * 3600 : (se.e - se.s) * 3600;
+                        let elapsed = (currentSecs >= startSecs) ? currentSecs - startSecs : (24 * 3600 - startSecs) + currentSecs;
+                        prog = Math.min(100, (elapsed / totalDur) * 100);
+                        let left = totalDur - elapsed;
+                        let h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), sec = Math.floor(left % 60);
+                        msg = `Closes in ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    } else {
+                        let timeToOpen = (currentSecs < startSecs) ? startSecs - currentSecs : (24 * 3600 - currentSecs) + startSecs;
+                        let h = Math.floor(timeToOpen / 3600), m = Math.floor((timeToOpen % 3600) / 60), sec = Math.floor(timeToOpen % 60);
+                        msg = isWeekend ? "Weekend" : `Opens in ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    }
+                    return { ...se, isOpen: sessionIsOpen, progress: prog, statusMsg: msg };
+                });
+                details.sort((a, b) => { if (a.isOpen && !b.isOpen) return -1; if (!a.isOpen && b.isOpen) return 1; return a.id - b.id; });
+                const isLon = active.includes("LDN"), isNY = active.includes("NYC");
+                const txt = isLon && isNY ? "🔥 POWER OVERLAP" : active.length > 0 ? `${active[0]} OPEN` : "Low Vol";
+                const col = isLon && isNY ? "text-orange-400 animate-pulse font-bold" : "text-slate-400";
+                setSessionData(prev => ({ ...prev, active, details, statusText: txt, statusColor: col, utcTime: d.toLocaleTimeString('en-US', {timeZone: 'UTC', hour12: false}) + " UTC", hasOverlap: isLon && isNY }));
+            };
+
+            // --- EFFECTS ---
+            useEffect(() => {
+                if (!isAuthenticated) return; // Don't start services if not logged in
+                
+                fetchLevels(); generateEconomicCalendar(); fetchLiveNews(); updateSessions();
+                const i1 = setInterval(() => { setNow(new Date()); updateSessions(); }, 1000);
+                const i2 = setInterval(fetchLevels, 60000);
+                const i3 = setInterval(() => { fetchLiveNews(); generateETFData(priceChange); }, 60000);
+                ws.current = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+                ws.current.onmessage = (e) => {
+                    const d = JSON.parse(e.data);
+                    const c = parseFloat(d.c), p = parseFloat(d.P);
+                    if(prevPrice.current && c !== prevPrice.current) { setFlashClass(c > prevPrice.current ? "flash-up" : "flash-down"); setTimeout(()=>setFlashClass(""),500); }
+                    prevPrice.current = c;
+                    setPrice(c); setPriceChange(p); setHigh24h(parseFloat(d.h)); setLow24h(parseFloat(d.l));
+                    setChartData(prev => {
+                        if(prev.length===0) return prev;
+                        const copy = [...prev]; const last = {...copy[copy.length-1]}; last.close=c;
+                        if(c>last.high) last.high=c; if(c<last.low) last.low=c;
+                        copy[copy.length-1]=last;
+                        const r = computeRSI(copy.map(x=>x.close));
+                        setRsi(Math.round(r));
+                        
+                        // Signal Logic with History Recording
+                        const calculatedSignal = determineSignal(c);
+                        setSignal(calculatedSignal);
+                        
+                        // AUTO SHARE LOGIC
+                        // Check if Auto Share is ON, signal is BUY/SELL (not PREP), and it's a NEW signal
+                        if (autoShareRef.current && 
+                           (calculatedSignal.type === 'BUY' || calculatedSignal.type === 'SELL') && 
+                           lastAutoSentSignalRef.current !== calculatedSignal.type) {
+                            
+                            // Trigger Auto Share
+                            shareSignalToWhatsapp(true, calculatedSignal, c);
+                            lastAutoSentSignalRef.current = calculatedSignal.type; // Update ref to prevent loops
+                        }
+                        
+                        // Reset ref if signal goes back to neutral/wait so it can trigger again later
+                        if (calculatedSignal.type === 'WAIT' || calculatedSignal.type === 'HOLD') {
+                            lastAutoSentSignalRef.current = null;
+                        }
+
+                        setSignalHistory(historyPrev => {
+                            // FILTER: Don't record 'WAIT', 'HOLD', or 'HOLD_TIGHT' (Only Actionable Signals)
+                            if (['WAIT', 'WAITING', 'HOLD', 'HOLD_TIGHT'].includes(calculatedSignal.type)) return historyPrev;
+                            
+                            // Prevent duplicates (Don't record if same signal repeats)
+                            if (historyPrev.length > 0 && historyPrev[0].type === calculatedSignal.type) return historyPrev;
+                            
+                            // Add new entry
+                            return [{
+                                ...calculatedSignal,
+                                price: c,
+                                time: new Date()
+                            }, ...historyPrev].slice(0, 50); // Keep last 50 entries
+                        });
+                        
+                        const lvls = levelsRef.current;
+                        let currentZone = 'mid';
+                        if (lvls.demandZone && c <= lvls.demandZone.high) currentZone = 'demand';
+                        else if (lvls.supplyZone && c >= lvls.supplyZone.low) currentZone = 'supply';
+
+                        if (currentZone !== lastZoneRef.current) {
+                            if (currentZone === 'demand') { setNotification({ msg: "Price Entered Demand Zone! 🟢 BUY Opportunity", type: "buy" }); setTimeout(() => setNotification(null), 6000); } 
+                            else if (currentZone === 'supply') { setNotification({ msg: "Price Entered Supply Zone! 🔴 SELL Opportunity", type: "sell" }); setTimeout(() => setNotification(null), 6000); }
+                            lastZoneRef.current = currentZone;
+                        }
+                        return copy;
+                    });
+                };
+                return () => { clearInterval(i1); clearInterval(i2); clearInterval(i3); if(ws.current) ws.current.close(); }
+            }, [isAuthenticated]);
+
+            useEffect(() => {
+                newsData.calendar.forEach(news => {
+                    const diff = news.eventDate - now;
+                    if (news.impact === 'High' && diff > 299000 && diff <= 300000 && !alertedEventsRef.current.has(news.title)) {
+                        setNotification({ msg: `⚠️ ALERT: ${news.title} in 5 Minutes!`, type: "sell" });
+                        alertedEventsRef.current.add(news.title);
+                        setTimeout(() => setNotification(null), 10000);
+                    }
+                });
+            }, [now, newsData.calendar]);
+
+            const saveOffset = (v) => { const n=parseFloat(v); setPriceOffset(isNaN(n)?0:n); try { localStorage.setItem('off', isNaN(n)?0:n); } catch(e){} };
+            useEffect(() => { try { const o=localStorage.getItem('off'); if(o) setPriceOffset(parseFloat(o)); } catch(e){} }, []);
+            
+            const saveMinGap = (v) => { const n = parseInt(v); setMinGap(n); minGapRef.current = n; try { localStorage.setItem('minGap', n); } catch(e){} };
+            useEffect(() => { try { const g = localStorage.getItem('minGap'); if(g) { const val = parseInt(g); setMinGap(val); minGapRef.current = val; } } catch(e){} }, []);
+
+            const dispPrice = price ? price + priceOffset : 0;
+            const dispHigh = high24h + priceOffset;
+            const dispLow = low24h + priceOffset;
+            const dispSup = (levels.support || 0) + priceOffset;
+            const dispRes = (levels.resistance || 0) + priceOffset;
+            const dispDemH = (levels.demandZone?.high || 0) + priceOffset;
+            const dispSupL = (levels.supplyZone?.low || 0) + priceOffset;
+
+            const getTrendReasons = () => {
+                const arr = [];
+                if(priceChange>2) arr.push("🚀 Strong Bullish: Buyers in control (>2%)");
+                else if(priceChange>0.5) arr.push("📈 Bullish: Steady uptrend");
+                else if(priceChange<-2) arr.push("🩸 Strong Bearish: Heavy selling (<-2%)");
+                else if(priceChange<-0.5) arr.push("📉 Bearish: Downtrend");
+                else arr.push("😴 Neutral: Sideways market");
+                return arr;
+            };
+
+            const getSignalColor = (sigType) => {
+                if (sigType === 'BUY' || sigType === 'PREP_BUY') return 'text-green-400';
+                if (sigType === 'SELL' || sigType === 'PREP_SELL') return 'text-red-400';
+                if (sigType === 'PREP_BUY' || sigType === 'PREP_SELL') return 'text-yellow-400';
+                return 'text-yellow-400';
+            };
+            
+            const getSignalBg = (sigType) => {
+                if (sigType === 'BUY') return 'bg-green-500/10 border-green-500/50 shadow-green-900/40';
+                if (sigType === 'SELL') return 'bg-red-500/10 border-red-500/50 shadow-red-900/40';
+                if (sigType === 'PREP_BUY' || sigType === 'PREP_SELL') return 'bg-yellow-500/10 border-yellow-500/50 shadow-yellow-900/40';
+                return 'bg-slate-800/50 border-slate-600';
+            }
+
+            // --- LOGIN SCREEN ---
+            if (!isAuthenticated) {
+                // Subscription Message Generator
+                const subMessage = 
+`Hello Reezoon Trading Group! 👋
+
+I want to subscribe to *BTC Live Trader Pro* app.
+
+🔥 *App Features:*
+• Live Buy/Sell Signals 🎯
+• Technical Analysis (Urdu) 📝
+• Fundamental News & Impact 🌍
+• Auto-WhatsApp Alerts 🚀
+
+💎 *Subscription Plans:*
+• 1 Week: $20
+• 1 Month: $50
+• 6 Months: $299
+• Lifetime: Contact Admin
+
+Please send me payment details for activation.
+Admin Contact: +971 52 117 1940`;
+
+                // Direct Chat Link (Only for fallback)
+                const subUrl = `https://wa.me/971521171940?text=${encodeURIComponent(subMessage)}`;
+
+                // Use Native Share (System Drawer) to allow picking WhatsApp vs WhatsApp Business
+                const handleSubscription = async () => {
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: 'Get Subscription',
+                                text: subMessage
+                                // URL removed to prevent "big link" preview
+                            });
+                        } catch (err) {
+                            console.log('Share cancelled, opening direct link');
+                            // Optional: Fallback to window.open if share fails, but often better to do nothing if user cancelled
+                        }
+                    } else {
+                        window.open(subUrl, '_blank');
+                    }
+                };
+
+                return (
+                    <div className="h-full flex flex-col items-center justify-center bg-slate-900 text-white p-4 animate-in fade-in duration-500 relative overflow-hidden">
+                        {/* Background Effects */}
+                        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[100px]"></div>
+                            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-500/10 rounded-full blur-[100px]"></div>
+                        </div>
+
+                        <div className="w-full max-w-sm bg-slate-800/80 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-slate-700 shadow-2xl relative z-10">
+                            
+                            {/* Professional Logo Section */}
+                            <div className="flex justify-center mb-6 relative">
+                                <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full transform scale-150"></div>
+                                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-600 flex items-center justify-center shadow-2xl relative z-10 group transition-transform hover:scale-105 duration-500">
+                                    <img 
+                                        src="https://cryptologos.cc/logos/bitcoin-btc-logo.png" 
+                                        className="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(247,147,26,0.3)]"
+                                        alt="BTC Logo"
+                                    />
+                                    <div className="absolute -bottom-2 -right-2 bg-slate-900 rounded-full p-1.5 border border-slate-600 shadow-lg">
+                                        <Lock size={12} className="text-green-400"/>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="text-center mb-6">
+                                <h2 className="text-xl font-black text-white tracking-tight mb-1">SECURE TERMINAL</h2>
+                                <div className="flex items-center justify-center gap-2">
+                                    <span className="h-[1px] w-8 bg-slate-600"></span>
+                                    <p className="text-slate-400 text-[9px] uppercase tracking-[0.2em] font-bold">BTC Live Trader Pro</p>
+                                    <span className="h-[1px] w-8 bg-slate-600"></span>
+                                </div>
+                            </div>
+
+                            {/* AUTH MODE TOGGLE */}
+                            <div className="flex bg-slate-900/80 p-1 rounded-xl mb-6 border border-slate-700">
+                                <button type="button" onClick={() => {setAuthMode('LOGIN'); setIsForgotPass(false); setLoginError("");}} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex justify-center items-center gap-1.5 ${authMode === 'LOGIN' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                    <Lock size={14}/> LOGIN
+                                </button>
+                                <button type="button" onClick={() => {setAuthMode('ACTIVATE'); setIsForgotPass(false); setLoginError("");}} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex justify-center items-center gap-1.5 ${authMode === 'ACTIVATE' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                    <Key size={14}/> ACTIVATE DEVICE
+                                </button>
+                            </div>
+                            
+                            {/* ERROR MESSAGE DISPLAY */}
+                            {(loginError || copySuccess) && (
+                                <div className={`border text-xs p-3 rounded-xl text-center font-bold mb-4 flex items-center justify-center gap-2 transition-all ${copySuccess || loginError.includes("Successful") ? 'bg-green-500/10 border-green-500/50 text-green-400' : 'bg-red-500/10 border-red-500/50 text-red-400 animate-pulse'}`}>
+                                    {copySuccess || loginError.includes("Successful") ? <Check size={14}/> : <AlertTriangle size={14}/>} 
+                                    {copySuccess ? "Copied Device ID!" : loginError}
+                                </div>
+                            )}
+
+                            {/* --- TAB 1: LOGIN --- */}
+                            {authMode === 'LOGIN' && !isForgotPass && (
+                                <form onSubmit={handleLogin} className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 flex items-center gap-1"><Icon size={10}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></Icon> Username</label>
+                                        <div className="relative group">
+                                            <input 
+                                                type="text" 
+                                                value={loginUser}
+                                                onChange={e => setLoginUser(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-orange-500 focus:outline-none transition-all focus:shadow-[0_0_15px_rgba(249,115,22,0.1)] text-sm font-bold tracking-wide pl-10"
+                                                placeholder="ENTER USERNAME"
+                                                autoComplete="username"
+                                            />
+                                            <div className="absolute left-3 top-3 text-slate-500 group-focus-within:text-orange-500 transition-colors">
+                                                <Icon size={16}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></Icon>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 flex items-center gap-1"><Lock size={10}/> Password</label>
+                                        <div className="relative group">
+                                            <input 
+                                                type="password" 
+                                                value={loginPass}
+                                                onChange={e => setLoginPass(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-orange-500 focus:outline-none transition-all focus:shadow-[0_0_15px_rgba(249,115,22,0.1)] text-sm font-bold tracking-wide pl-10"
+                                                placeholder="••••••••"
+                                                autoComplete="current-password"
+                                            />
+                                            <div className="absolute left-3 top-3 text-slate-500 group-focus-within:text-orange-500 transition-colors">
+                                                <Lock size={16}/>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-2 ml-1">
+                                        {/* Remember Me Checkbox */}
+                                        <label className="flex items-center cursor-pointer checkbox-wrapper group">
+                                            <input 
+                                                type="checkbox" 
+                                                className="hidden" 
+                                                checked={rememberMe}
+                                                onChange={(e) => setRememberMe(e.target.checked)}
+                                            />
+                                            <div className="w-4 h-4 border-2 border-slate-600 rounded flex items-center justify-center transition-colors group-hover:border-slate-500 bg-slate-900">
+                                                <svg className="w-3 h-3 text-white hidden pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 font-bold ml-2 select-none group-hover:text-slate-300 uppercase tracking-wide">Remember Me</span>
+                                        </label>
+
+                                        {/* Forgot Password Link */}
+                                        <button type="button" onClick={() => {setIsForgotPass(true); setLoginError("");}} className="text-[10px] text-orange-400 font-bold hover:text-orange-300 uppercase">
+                                            Forgot Password?
+                                        </button>
+                                    </div>
+                                    
+                                    <button type="submit" className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 py-3.5 rounded-xl font-bold text-white shadow-lg shadow-orange-900/20 transition-all active:scale-[0.98] mt-4 text-sm tracking-wide uppercase flex items-center justify-center gap-2 group border border-orange-400/20">
+                                        Authenticate <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
+                                    </button>
+                                </form>
+                            )}
+
+                            {/* --- TAB 1B: FORGOT PASSWORD (MASTER KEY) --- */}
+                            {authMode === 'LOGIN' && isForgotPass && (
+                                <form onSubmit={handleResetPassword} className="space-y-4">
+                                    <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-xl mb-2 text-center">
+                                        <Shield size={20} className="text-red-400 mx-auto mb-1"/>
+                                        <p className="text-[10px] text-red-400 uppercase font-bold">Admin Master Override</p>
+                                        <p className="text-[9px] text-slate-400 mt-1">Requires Admin Master Key to reset user password.</p>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Target Username</label>
+                                        <input type="text" value={resetUser} onChange={e => setResetUser(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:border-red-500 focus:outline-none text-sm font-bold" placeholder="Username to reset" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">New Password</label>
+                                        <input type="password" value={newPassInput} onChange={e => setNewPassInput(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:border-red-500 focus:outline-none text-sm font-bold" placeholder="Set New Password" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-red-400 uppercase ml-1">Master Key</label>
+                                        <input type="password" value={masterKeyInput} onChange={e => setMasterKeyInput(e.target.value)} className="w-full bg-slate-900 border border-red-900/50 rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:border-red-500 focus:outline-none text-sm font-bold" placeholder="Enter Admin Master Key" />
+                                    </div>
+
+                                    <div className="flex gap-2 mt-4">
+                                        <button type="button" onClick={() => {setIsForgotPass(false); setLoginError("");}} className="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold text-white text-xs uppercase transition-colors">
+                                            Cancel
+                                        </button>
+                                        <button type="submit" className="flex-[2] bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 py-3 rounded-xl font-bold text-white shadow-lg shadow-red-900/20 transition-all active:scale-[0.98] text-xs uppercase flex items-center justify-center gap-2 border border-red-400/20">
+                                            Force Reset <Shield size={14} />
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+
+                            {/* --- TAB 2: ACTIVATE DEVICE --- */}
+                            {authMode === 'ACTIVATE' && (
+                                <form onSubmit={handleActivate} className="space-y-4">
+                                    <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl mb-2 text-center">
+                                        <p className="text-[10px] text-blue-400 uppercase font-bold mb-1">Your Unique Device ID</p>
+                                        <div className="flex items-center justify-center gap-2 cursor-pointer group" onClick={() => copyToClipboard(deviceId)}>
+                                            <span className="text-lg font-mono font-black text-white tracking-wider group-hover:text-blue-300 transition-colors">{deviceId}</span>
+                                            <CopyIcon size={16} className="text-blue-500 group-hover:text-blue-300"/>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-2">Tap to copy & send to Admin for a License Key.</p>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 flex items-center gap-1"><Key size={10}/> Enter License Key</label>
+                                        <div className="relative group">
+                                            <input 
+                                                type="text" 
+                                                value={licenseKeyInput}
+                                                onChange={e => setLicenseKeyInput(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:border-blue-500 focus:outline-none transition-all focus:shadow-[0_0_15px_rgba(59,130,246,0.1)] text-sm font-bold tracking-wide pl-10"
+                                                placeholder="Paste License Key Here..."
+                                            />
+                                            <div className="absolute left-3 top-3 text-slate-500 group-focus-within:text-blue-500 transition-colors">
+                                                <Key size={16}/>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 py-3.5 rounded-xl font-bold text-white shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98] mt-4 text-sm tracking-wide uppercase flex items-center justify-center gap-2 group border border-blue-400/20">
+                                        Activate License <Check size={16} className="group-hover:scale-110 transition-transform"/>
+                                    </button>
+                                </form>
+                            )}
+
+                            {/* Subscription Contact Info - Updated to Button for Share Logic */}
+                            <div className="mt-6 pt-6 border-t border-slate-700/50 text-center">
+                                <p className="text-[10px] text-slate-500 mb-3 font-medium uppercase tracking-wider">Access Required?</p>
+                                <button 
+                                    onClick={handleSubscription}
+                                    className="w-full text-xs font-bold text-blue-400 hover:text-white flex items-center justify-center gap-2 bg-slate-700/50 py-3 rounded-xl border border-slate-600 hover:bg-blue-600 hover:border-blue-500 transition-all active:scale-95"
+                                >
+                                    <Share2 size={14}/> Get Subscription Plans
+                                </button>
+                            </div>
+
+                            <div className="absolute bottom-2 left-0 w-full text-center">
+                                <p className="text-[8px] text-slate-600 uppercase font-bold tracking-widest">
+                                    Reezoon Trading Group • Secure v2.5
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="h-full flex flex-col bg-slate-900 text-white overflow-hidden pb-1 relative">
+                    {/* NOTIFICATION POPUP */}
+                    {notification && (
+                        <div className="absolute top-24 left-4 right-4 z-50 notification-pop pointer-events-none">
+                            <div className={`p-4 rounded-xl border-2 shadow-2xl flex items-center gap-3 backdrop-blur-md ${notification.type === 'buy' ? 'bg-green-900/90 border-green-500 text-white' : 'bg-red-900/90 border-red-500 text-white'}`}>
+                                <Shield size={28} className="animate-pulse" />
+                                <div><h4 className="font-bold text-lg leading-tight uppercase">Zone Alert!</h4><p className="text-sm font-medium">{notification.msg}</p></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Header */}
+                    <header className="bg-slate-800 border-b border-slate-700 px-4 pb-4 shrink-0 flex justify-between items-center z-10 shadow-md" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 via-orange-500 to-yellow-400 flex items-center justify-center shadow-lg shadow-orange-500/20 border border-white/10 relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-full h-full bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                <DollarSign size={28} className="text-white drop-shadow-md" strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-white leading-none flex items-center gap-1">
+                                   BTC PRO <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 font-mono">LIVE</span>
+                                </h1>
+                                
+                                {/* User Access Info in Header */}
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{currentUser || "User"}</span>
+                                    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${daysRemaining < 5 ? 'bg-red-500/20 border border-red-500/30 text-red-400' : 'bg-green-500/20 border border-green-500/30 text-green-400'}`}>
+                                        <Clock size={8} />
+                                        <span className="text-[8px] font-bold font-mono">{daysRemaining > 3650 ? 'LIFETIME' : `${daysRemaining} Days`}</span>
+                                    </div>
+                                </div>
+
+                                <div onClick={() => setActiveModal('session')} className="flex items-center gap-1.5 cursor-pointer mt-1 hover:opacity-80 transition-opacity">
+                                    <div className={`w-2 h-2 rounded-full ${sessionData.active.length > 0 ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]" : "bg-slate-500"}`}></div>
+                                    <span className={`text-xs font-bold tracking-wide ${sessionData.statusColor}`}>{sessionData.statusText}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button onClick={()=>setActiveModal('live_chart')} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 transition-colors relative group">
+                                <CandlestickChart size={20} className="text-blue-400 group-hover:text-white transition-colors"/>
+                                <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-slate-800 animate-pulse"></div>
+                            </button>
+                            <button onClick={()=>setActiveModal('news')} className="p-2 bg-slate-700 rounded-full relative"><Calendar size={20} className="text-slate-300"/><div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-800 animate-pulse"></div></button>
+                            <button onClick={()=>setActiveModal('settings')} className="p-2 bg-slate-700 rounded-full"><Settings size={20} className="text-slate-300"/></button>
+                        </div>
+                    </header>
+                    
+                    {/* PROFESSIONAL 5-SESSION TICKER */}
+                    <div className="bg-slate-950 border-b border-slate-800 px-2 py-1.5 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+                        {sessionData.details.map((s, i) => {
+                            const isOverlapping = sessionData.hasOverlap && sessionData.active.includes(s.code);
+                            return (
+                                <div key={i} className={`shrink-0 flex flex-col justify-center px-3 py-1 rounded border min-w-[95px] transition-all relative ${s.isOpen ? 'bg-slate-800 border-slate-600 shadow-md' : 'bg-transparent border-transparent opacity-40 grayscale'} ${isOverlapping ? 'border-orange-500/50 shadow-orange-900/20' : ''}`}>
+                                    {isOverlapping && <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full animate-ping"></div>}
+                                    <div className="flex justify-between items-center gap-2 mb-1">
+                                        <span className={`text-[10px] font-bold tracking-wide ${s.color}`}>{s.n}</span>
+                                        {s.isOpen && <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>}
+                                    </div>
+                                    {s.isOpen ? (
+                                        <>
+                                            <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-0.5">
+                                                <div className="h-full bg-blue-500 progress-bar" style={{ width: `${s.progress}%` }}></div>
+                                            </div>
+                                            <span className="text-[8px] text-slate-300 font-mono leading-none block text-right tracking-tight">{s.statusMsg.replace('Closes in ', '')} left</span>
+                                        </>
+                                    ) : (
+                                        <span className="text-[8px] text-slate-500 leading-none block mt-1 font-mono tracking-tight">{s.statusMsg.replace('Opens in ', 'In ')}</span>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* Main UI Structure */}
+                    <main className="flex-1 flex flex-col p-2 gap-2 overflow-hidden">
+                        <div className="flex gap-2 h-[20%] min-h-[90px]">
+                            <div className="flex-1 bg-slate-800 rounded-xl p-3 border border-slate-700 relative flex flex-col justify-center">
+                                <span className="text-slate-400 text-[10px] font-bold uppercase">Market Price</span>
+                                <h2 className={`text-3xl font-bold tracking-tight ${flashClass ? flashClass : 'text-white'}`}>${dispPrice.toLocaleString(undefined, {maximumFractionDigits:0})}</h2>
+                                <div className={`flex items-center gap-1 text-sm font-bold ${priceChange>=0?'text-green-400':'text-red-400'}`}>
+                                    {priceChange>=0?<TrendingUp size={14}/>:<TrendingDown size={14}/>} <span>{priceChange?.toFixed(2)}%</span>
+                                </div>
+                            </div>
+                            <div onClick={()=>setActiveModal('trend')} className="w-[40%] bg-slate-800 rounded-xl p-2 border border-slate-700 flex flex-col justify-center items-center text-center gap-1 cursor-pointer active:scale-95">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-1">Trend <Info size={8}/></span>
+                                <span className={`text-xs font-bold ${priceChange>0.5?'text-green-400':priceChange<-0.5?'text-red-400':'text-yellow-400'}`}>{priceChange>0.5?'Bullish':priceChange<-0.5?'Bearish':'Neutral'}</span>
+                                <div className="h-[1px] w-full bg-slate-700 my-1"></div>
+                                <span className="text-[9px] text-slate-400 font-bold uppercase">Vol</span>
+                                <span className={`text-[10px] font-bold ${sessionData.active.length>1?'text-orange-400':'text-slate-300'}`}>{sessionData.active.length>1?'High 🔥': 'Normal'}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 min-h-0 flex flex-col justify-center relative items-center gap-2">
+                             <div className="bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-full flex items-center gap-2 text-xs backdrop-blur-sm z-10 shadow-sm">
+                                <span className="text-slate-400 font-bold text-[9px] uppercase flex items-center gap-1"><ArrowUpCircle size={10} className="text-green-500"/> Daily High</span>
+                                <span className="text-green-400 font-mono font-bold">${high24h.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                             </div>
+
+                             <div onClick={()=>setActiveModal('analysis')} className={`w-full flex-1 relative rounded-2xl border-2 flex flex-col items-center justify-center text-center shadow-2xl active:scale-[0.98] transition-all overflow-hidden ${getSignalBg(signal.type)}`}>
+                                <CandleChart data={chartData} />
+                                {/* IMPORTANT: Two Side-by-Side Signal Blocks */}
+                                <div className="relative z-10 w-full px-2 flex gap-2 h-full py-2">
+                                    
+                                    {/* 1. TECHNICAL SIGNAL BLOCK */}
+                                    <div onClick={(e)=>{e.stopPropagation(); setActiveModal('technical_details');}} className="flex-1 bg-slate-900/80 backdrop-blur-md rounded-xl border border-white/10 shadow-lg flex flex-col items-center justify-center p-2 cursor-pointer hover:bg-white/5 transition-colors">
+                                        <span className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-1">Technical</span>
+                                        <div className="mb-1">
+                                            {signal.type === 'BUY' && <ArrowUpCircle size={32} className="text-green-400 animate-bounce-slow" />}
+                                            {signal.type === 'SELL' && <ArrowDownCircle size={32} className="text-red-400 animate-bounce-slow" />}
+                                            {(signal.type === 'PREP_BUY' || signal.type === 'PREP_SELL' || signal.type === 'HOLD' || signal.type === 'HOLD_TIGHT') && <Hand size={32} className="text-yellow-400" />}
+                                            {signal.type === 'WAIT' && <Activity size={32} className="text-slate-400" />}
+                                        </div>
+                                        <h3 className={`text-sm font-black tracking-tight leading-none text-center ${getSignalColor(signal.type)}`}>
+                                            {signal.leaderText}
+                                        </h3>
+                                        
+                                        {/* Display Wait Price for Watch Signals */}
+                                        {(signal.type === 'PREP_BUY' || signal.type === 'PREP_SELL') && signal.waitPrice && (
+                                            <div className="bg-slate-950/50 px-2 py-0.5 rounded border border-slate-700 mt-1">
+                                                <span className="text-[9px] text-slate-400 font-mono">Wait: </span>
+                                                <span className="text-[10px] font-bold text-white font-mono">${signal.waitPrice.toFixed(0)}</span>
+                                            </div>
+                                        )}
+
+                                        <p className="text-[8px] text-slate-300 mt-1 font-mono text-center leading-tight">
+                                            {signal.type === 'BUY' ? 'Demand Zone Reached' : 
+                                             signal.type === 'SELL' ? 'Supply Zone Reached' : 
+                                             signal.type.includes('PREP') ? 'Approaching Zone...' :
+                                             'Mid Range / No Setup'}
+                                        </p>
+                                    </div>
+
+                                    {/* 2. FUNDAMENTAL (NEWS) SIGNAL BLOCK */}
+                                    <div onClick={(e)=>{e.stopPropagation(); setActiveModal('fundamental_details');}} className="flex-1 bg-slate-900/80 backdrop-blur-md rounded-xl border border-white/10 shadow-lg flex flex-col items-center justify-center p-2 cursor-pointer hover:bg-white/5 transition-colors">
+                                        <span className="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-1">News Bias</span>
+                                        <div className="mb-1">
+                                            {funSignal.type === 'BUY' && <TrendingUp size={32} className="text-green-400" />}
+                                            {funSignal.type === 'SELL' && <TrendingDown size={32} className="text-red-400" />}
+                                            {funSignal.type === 'NEUTRAL' && <Activity size={32} className="text-yellow-400" />}
+                                            {funSignal.type === 'HOLD' && <Activity size={32} className="text-slate-400" />}
+                                        </div>
+                                        <h3 className={`text-sm font-black tracking-tight leading-none text-center ${funSignal.type === 'BUY' ? 'text-green-400' : funSignal.type === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                            {funSignal.leaderText}
+                                        </h3>
+                                        <p className="text-[8px] text-slate-300 mt-1 font-mono text-center leading-tight">
+                                            Based on ETF & Trends
+                                        </p>
+                                    </div>
+
+                                </div>
+                                {/* ADDED THIS LINE: Display "FILHAL WAIT KARYN" message for PREP signals */}
+                                {(signal.type === 'PREP_BUY' || signal.type === 'PREP_SELL') && 
+                                    <div className="absolute bottom-1 w-full text-center z-20"><span className="text-[9px] bg-yellow-500/90 text-black px-3 py-0.5 rounded-full font-bold uppercase tracking-widest animate-pulse shadow-lg">FILHAL WAIT KARYN ✋</span></div>
+                                }
+                            </div>
+
+                            <div className="bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-full flex items-center gap-2 text-xs backdrop-blur-sm z-10 shadow-sm">
+                                <span className="text-slate-400 font-bold text-[9px] uppercase flex items-center gap-1"><ArrowDownCircle size={10} className="text-red-500"/> Daily Low</span>
+                                <span className="text-red-400 font-mono font-bold">${low24h.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 h-[25%] min-h-[110px] shrink-0 mb-safe mt-1">
+                             <div className="rounded-xl border border-slate-700 bg-slate-800 flex flex-col justify-center divide-y divide-slate-700">
+                                <div className="flex-1 flex flex-col justify-center items-center bg-red-900/10">
+                                     <div className="flex items-center gap-1 text-red-400 mb-1"><TrendingUp size={12} className="rotate-180"/> <span className="text-[10px] font-bold uppercase">Supply (Sell)</span></div>
+                                     <span className="text-lg font-mono font-bold text-white tracking-wide">${dispSupL.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                </div>
+                                <div className="flex-1 flex flex-col justify-center items-center bg-green-900/10 border-t border-slate-700">
+                                     <div className="flex items-center gap-1 text-green-400 mb-1"><TrendingUp size={12}/> <span className="text-[10px] font-bold uppercase">Demand (Buy)</span></div>
+                                     <span className="text-lg font-mono font-bold text-white tracking-wide">${dispDemH.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                                </div>
+                             </div>
+                             <div onClick={()=>setActiveModal('rsi')} className="bg-slate-800 rounded-xl border border-slate-700 flex flex-col justify-center p-3 text-center cursor-pointer hover:bg-slate-700/50">
+                                 <div className="flex justify-between items-end mb-1">
+                                     <span className="text-[9px] text-slate-500 uppercase font-bold flex items-center gap-1">RSI Strength <Maximize size={8}/></span>
+                                     <span className={`text-xs font-bold ${rsi>70?'text-red-400':rsi<30?'text-green-400':'text-blue-400'}`}>{rsi}</span>
+                                 </div>
+                                 <div className="relative w-full h-8 flex items-end justify-between gap-0.5 mb-2">
+                                     {[...Array(10)].map((_, i) => (
+                                         <div key={i} className={`w-full rounded-sm transition-all duration-500 ${i<(rsi/10)?(rsi>70?'bg-red-500':rsi<30?'bg-green-500':'bg-blue-500'):'bg-slate-700'}`} style={{ height: `${(i+1)*10}%` }}></div>
+                                     ))}
+                                 </div>
+                                 <div className="bg-slate-900/50 rounded p-1"><p className="text-[9px] text-slate-300 leading-tight">{rsi>70?"Overbought (Risk)":rsi<30?"Oversold (Opp)":"Neutral Zone"}</p></div>
+                             </div>
+                        </div>
+                    </main>
+
+                    {/* --- MODALS --- */}
+                    {activeModal && (
+                        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={()=>{setActiveModal(null); setIsLandscape(false);}}>
+                            <div 
+                                className={`bg-slate-800 w-full flex flex-col relative shadow-2xl transition-all ${
+                                    activeModal === 'live_chart' 
+                                    ? (isLandscape 
+                                        ? 'bg-slate-900 border-0 p-0' // Fixed styles are handled in style prop below
+                                        : 'h-full md:h-[90vh] md:max-w-5xl rounded-none md:rounded-2xl p-2 md:p-4 border-0 md:border border-slate-600')
+                                    : 'max-w-sm max-h-[85vh] rounded-2xl p-5 border border-slate-600'
+                                }`} 
+                                style={isLandscape ? {
+                                    position: 'fixed',
+                                    top: '50%',
+                                    left: '50%',
+                                    width: '100vh',  // Width = Screen Height
+                                    height: '100vw', // Height = Screen Width
+                                    transform: 'translate(-50%, -50%) rotate(90deg)', // Perfect Centering
+                                    transformOrigin: 'center center',
+                                    zIndex: 60,
+                                    borderRadius: 0,
+                                    margin: 0
+                                } : {}}
+                                onClick={e=>e.stopPropagation()}
+                            >
+                                <button onClick={()=>{setActiveModal(null); setIsLandscape(false);}} className={`absolute p-2 bg-slate-700 hover:bg-slate-600 rounded-full z-20 transition-colors shadow-lg ${isLandscape ? 'top-4 left-4' : 'top-2 right-2 md:top-4 md:right-4'}`}><X size={20}/></button>
+                                
+                                {activeModal === 'settings' && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-white flex gap-2 items-center"><Settings size={20} className="text-blue-400"/> Settings & Config</h3>
+                                        </div>
+
+                                        {/* TABS MENU */}
+                                        <div className="flex bg-slate-900/80 p-1 rounded-xl mb-4 border border-slate-700 shadow-inner">
+                                            <button onClick={() => setActiveSettingsTab('security')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase flex justify-center items-center gap-1.5 ${activeSettingsTab === 'security' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                                <Lock size={14}/> Security
+                                            </button>
+                                            <button onClick={() => setActiveSettingsTab('trading')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase flex justify-center items-center gap-1.5 ${activeSettingsTab === 'trading' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                                <Target size={14}/> Trading
+                                            </button>
+                                            <button onClick={() => setActiveSettingsTab('system')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase flex justify-center items-center gap-1.5 ${activeSettingsTab === 'system' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                                                <Activity size={14}/> System
+                                            </button>
+                                        </div>
+
+                                        <div className="overflow-y-auto pr-1 custom-scrollbar max-h-[55vh]">
+                                            {/* TAB 1: SECURITY */}
+                                            {activeSettingsTab === 'security' && (
+                                                <div className="space-y-4 animate-in fade-in duration-300">
+                                                    {/* Profile Info Card */}
+                                                    <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden">
+                                                        <div className="absolute top-0 right-0 p-3 opacity-5"><Lock size={60}/></div>
+                                                        <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2 relative z-10">
+                                                            <span className="text-sm font-bold text-white">Account Profile</span>
+                                                            <span className="text-[9px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono uppercase tracking-widest shadow-[0_0_10px_rgba(74,222,128,0.2)]">Active</span>
+                                                        </div>
+                                                        <div className="space-y-2 relative z-10">
+                                                            <div className="flex justify-between items-center text-xs text-slate-400">
+                                                                <span className="uppercase font-bold text-[9px]">Username</span> 
+                                                                <span className="text-white font-mono bg-slate-950 px-2 py-1 rounded border border-slate-800">{currentUser}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-xs text-slate-400">
+                                                                <span className="uppercase font-bold text-[9px]">License Validity</span> 
+                                                                <span className="text-blue-400 font-mono font-bold">{daysRemaining > 3650 ? 'Lifetime Access' : daysRemaining + ' Days Left'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Change Password Card */}
+                                                    <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-sm">
+                                                        <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-3 uppercase tracking-wider"><Key size={14} className="text-blue-400"/> Update Password</h4>
+                                                        
+                                                        {changePassMsg && (
+                                                            <div className={`text-[10px] font-bold p-2.5 rounded-lg mb-3 text-center flex items-center justify-center gap-2 ${changePassMsg.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
+                                                                {changePassMsg.type === 'error' ? <AlertTriangle size={14}/> : <Check size={14}/>} {changePassMsg.text}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="space-y-3">
+                                                            <div>
+                                                                <label className="text-[9px] text-slate-500 font-bold uppercase ml-1 block mb-1">Current Password</label>
+                                                                <input type="password" value={oldPassInput} onChange={e=>setOldPassInput(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none text-white font-mono tracking-widest"/>
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[9px] text-slate-500 font-bold uppercase ml-1 block mb-1">New Password</label>
+                                                                <input type="password" value={changePassInput} onChange={e=>setChangePassInput(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm focus:border-blue-500 outline-none text-white font-mono tracking-widest"/>
+                                                            </div>
+                                                            <button onClick={handleChangePassword} className="w-full bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-400 py-2.5 rounded-lg text-xs font-bold transition-all mt-2 active:scale-95">Save New Password</button>
+                                                        </div>
+                                                    </div>
+
+                                                    <button onClick={handleLogout} className="w-full py-3.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl font-bold text-sm mt-2 flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95">
+                                                        <LogOut size={16} /> Secure Logout
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* TAB 2: TRADING */}
+                                            {activeSettingsTab === 'trading' && (
+                                                <div className="space-y-4 animate-in fade-in duration-300">
+                                                    <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden group">
+                                                        <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Target size={100}/></div>
+                                                        <div className="flex justify-between items-center mb-2 relative z-10">
+                                                            <div className="text-sm font-bold text-white flex items-center gap-2"><Target size={18} className="text-blue-400"/> Price Offset</div>
+                                                            <input type="number" value={priceOffset} onChange={(e) => saveOffset(e.target.value)} className="w-24 bg-slate-950 border border-slate-600 rounded-lg p-2 text-sm focus:border-blue-500 outline-none text-white text-center font-bold" placeholder="0"/>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 leading-relaxed relative z-10 pr-4">Agar aapke exchange (e.g. Binance/Bybit) ka live price is app se thora mukhtalif hai, toh yahan value daal kar (+ ya -) live price adjust karein.</p>
+                                                    </div>
+
+                                                    <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden group">
+                                                        <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity"><Activity size={100}/></div>
+                                                        <div className="flex justify-between items-center mb-2 relative z-10">
+                                                            <div className="text-sm font-bold text-white flex items-center gap-2"><Activity size={18} className="text-orange-400"/> Range Gap</div>
+                                                            <input type="number" value={minGap} onChange={(e) => saveMinGap(e.target.value)} className="w-24 bg-slate-950 border border-slate-600 rounded-lg p-2 text-sm focus:border-orange-500 outline-none text-white text-center font-bold" placeholder="1000"/>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 leading-relaxed relative z-10 pr-4">Valid Signal generate hone ke liye Support aur Resistance ke darmiyan kam az kam kitne points ka fasla (gap) hona chahiye. (Default: 1000)</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* TAB 3: SYSTEM */}
+                                            {activeSettingsTab === 'system' && (
+                                                <div className="space-y-4 animate-in fade-in duration-300">
+                                                    <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-sm relative overflow-hidden">
+                                                        <div className="flex justify-between items-center mb-2 relative z-10">
+                                                            <div className="text-sm font-bold text-white flex items-center gap-2"><Share2 size={18} className="text-green-400"/> Auto-Share WhatsApp</div>
+                                                            <div onClick={toggleAutoShare} className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors shadow-inner ${autoShare ? 'bg-green-500' : 'bg-slate-700'}`}>
+                                                                <div className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${autoShare ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 leading-relaxed relative z-10">Jab bhi market me naya "BUY" ya "SELL" signal confirm ho, toh automatically WhatsApp open ho jayega taki aap foran group me message send kar sakein.</p>
+                                                    </div>
+
+                                                    {/* ADMIN ONLY PANEL */}
+                                                    {currentUser && currentUser.toUpperCase() === 'ADMIN' && (
+                                                        <div className="bg-orange-900/10 p-5 rounded-xl border-2 border-orange-500/30 shadow-lg relative overflow-hidden">
+                                                            <div className="absolute -right-4 -top-4 opacity-[0.03] text-orange-500"><Shield size={120}/></div>
+                                                            <div className="relative z-10 text-center">
+                                                                <div className="mx-auto w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mb-3 border border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+                                                                    <Shield size={24} className="text-orange-400"/>
+                                                                </div>
+                                                                <h4 className="text-sm font-black text-orange-400 uppercase tracking-widest mb-1">Master Control Room</h4>
+                                                                <p className="text-[10px] text-slate-400 leading-relaxed mb-4 px-2">Naye users ke liye secure license keys generate karein aur purani keys ka history record check karein.</p>
+                                                                
+                                                                <button onClick={() => setActiveModal('admin_panel')} className="w-full py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 border border-orange-400/30">
+                                                                    Open License Generator <ArrowRight size={16}/>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeModal === 'admin_panel' && currentUser?.toUpperCase() === 'ADMIN' && (
+                                    <>
+                                        <h3 className="font-bold text-orange-400 mb-4 flex gap-2 items-center"><Shield size={20}/> License Generator</h3>
+                                        
+                                        <div className="space-y-3 bg-slate-900/50 p-3 rounded-xl border border-orange-500/30 mb-4">
+                                            <div>
+                                                <label className="text-[10px] text-slate-400 uppercase font-bold">Target Device ID</label>
+                                                <input type="text" value={genDeviceId} onChange={e=>setGenDeviceId(e.target.value)} placeholder="BTC-XXXX-XXXX" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm mt-1 focus:border-orange-500 outline-none text-white"/>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[10px] text-slate-400 uppercase font-bold">Username</label>
+                                                    <input type="text" value={genUsername} onChange={e=>setGenUsername(e.target.value)} placeholder="e.g. Ali" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm mt-1 focus:border-orange-500 outline-none text-white"/>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-slate-400 uppercase font-bold">Password</label>
+                                                    <input type="text" value={genPassword} onChange={e=>setGenPassword(e.target.value)} placeholder="Pass123" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm mt-1 focus:border-orange-500 outline-none text-white"/>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-400 uppercase font-bold">Access Days</label>
+                                                <input type="number" value={genDays} onChange={e=>setGenDays(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm mt-1 focus:border-orange-500 outline-none text-white"/>
+                                            </div>
+                                            
+                                            <button onClick={handleGenerateKey} className="w-full py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-bold text-white mt-2 shadow-lg transition-colors">
+                                                Generate License Key
+                                            </button>
+
+                                            {generatedKey && (
+                                                <div className="mt-2 p-3 bg-green-900/30 border border-green-500/50 rounded-lg text-center">
+                                                    <p className="text-[10px] text-green-400 uppercase font-bold mb-1">Generated Key (Click to Copy)</p>
+                                                    <div onClick={() => copyToClipboard(generatedKey)} className="break-all text-[10px] font-mono text-white bg-slate-900 p-2 rounded cursor-pointer hover:bg-slate-800 transition-colors border border-slate-700 max-h-20 overflow-y-auto custom-scrollbar">
+                                                        {generatedKey}
+                                                    </div>
+                                                    {copySuccess && <p className="text-[10px] text-green-400 mt-1 font-bold">Copied!</p>}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex justify-between items-center mb-2 mt-4">
+                                            <h4 className="text-xs font-bold text-slate-300 uppercase flex items-center gap-1"><HistoryIcon size={14}/> Key History</h4>
+                                            {keyHistory.length > 0 && <button onClick={clearKeyHistory} className="text-[10px] text-red-400 font-bold hover:text-red-300">Clear All</button>}
+                                        </div>
+
+                                        <div className="overflow-y-auto max-h-[30vh] space-y-2 pr-1 custom-scrollbar">
+                                            {keyHistory.length === 0 ? (
+                                                <p className="text-xs text-slate-500 text-center py-4">No history found.</p>
+                                            ) : (
+                                                keyHistory.map((item, idx) => (
+                                                    <div key={idx} className="bg-slate-900/50 p-2 rounded border border-slate-700">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <div>
+                                                                <div className="text-xs font-bold text-white">{item.user} <span className="text-[9px] text-slate-500 font-normal">({item.days} Days)</span></div>
+                                                                <div className="text-[9px] text-orange-400 font-mono">{item.did}</div>
+                                                            </div>
+                                                            <div className="text-[9px] text-slate-500 text-right">
+                                                                {item.date}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <div className="flex-1 bg-slate-900 text-[9px] text-slate-400 px-2 py-1.5 rounded border border-slate-700 truncate font-mono">
+                                                                {item.key}
+                                                            </div>
+                                                            <button onClick={() => copyToClipboard(item.key)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded text-blue-400 transition-colors">
+                                                                <CopyIcon size={12}/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeModal === 'technical_details' && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-white flex gap-2 items-center"><FileText size={20} className="text-blue-400"/> Technical Khulasa</h3>
+                                            <button onClick={() => setActiveModal('live_chart')} className="bg-slate-700 hover:bg-slate-600 p-1.5 px-3 rounded-lg text-xs font-bold flex items-center gap-1 text-blue-400 border border-slate-600 transition-colors shadow-sm mr-10">
+                                                <BarChart size={14} /> Chart
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative overflow-hidden">
+                                                <div className={`absolute top-0 right-0 p-2 opacity-10 ${getSignalColor(signal.type)}`}>
+                                                    {signal.type === 'BUY' ? <TrendingUp size={80}/> : signal.type === 'SELL' ? <TrendingDown size={80}/> : <Activity size={80}/>}
+                                                </div>
+                                                <h4 className={`text-sm font-bold uppercase mb-2 ${getSignalColor(signal.type)} relative z-10`}>{signal.type} SIGNAL DETECTED</h4>
+                                                
+                                                {/* Detailed Wait Price in Popup */}
+                                                {(signal.type === 'PREP_BUY' || signal.type === 'PREP_SELL') && signal.waitPrice && (
+                                                    <div className="relative z-10 mb-3 bg-slate-800 p-2 rounded-lg border border-slate-600 flex justify-between items-center shadow-inner">
+                                                        <span className="text-xs text-slate-400 uppercase font-bold">Safe Entry Price:</span>
+                                                        <span className="text-lg font-mono font-bold text-yellow-400">${signal.waitPrice.toFixed(0)}</span>
+                                                    </div>
+                                                )}
+
+                                                <p className="text-sm text-slate-200 leading-relaxed font-sans relative z-10">{signal.urdu}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                                                <div className="bg-slate-900 p-2 rounded border border-slate-700"><span className="block text-[9px] text-slate-500 uppercase">Support</span>${dispDemH.toFixed(0)}</div>
+                                                <div className="bg-slate-900 p-2 rounded border border-slate-700"><span className="block text-[9px] text-slate-500 uppercase">Resistance</span>${dispSupL.toFixed(0)}</div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={() => setActiveModal('signal_history')} className="flex items-center justify-center gap-2 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-white text-xs transition-colors border border-slate-600">
+                                                    <HistoryIcon size={16} /> History
+                                                </button>
+                                                <button onClick={() => shareSignalToWhatsapp()} className="flex items-center justify-center gap-2 py-3 bg-[#25D366] hover:bg-[#20bd5a] rounded-xl font-bold text-white text-xs transition-colors shadow-lg shadow-green-900/20">
+                                                    <Share2 size={16} /> Share Signal
+                                                </button>
+                                            </div>
+
+                                            <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                                                <p className="text-[10px] text-blue-300"><strong>Note:</strong> Yeh analysis M15 chart structure aur RSI momentum par mabni hai. Hamesha apni research karein.</p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeModal === 'signal_history' && (
+                                    <>
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <button onClick={() => setActiveModal('technical_details')} className="p-1 rounded hover:bg-slate-700"><ArrowRight size={20} className="rotate-180 text-slate-400"/></button>
+                                            <h3 className="font-bold text-white flex gap-2 items-center"><HistoryIcon size={20} className="text-blue-400"/> Signal History</h3>
+                                        </div>
+                                        
+                                        {signalHistory.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+                                                <Activity size={40} className="mb-2 opacity-20"/>
+                                                <p className="text-xs">No signals recorded yet.</p>
+                                                <p className="text-[10px] mt-1">History will appear as market moves.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-y-auto max-h-[60vh] space-y-2 pr-1 custom-scrollbar">
+                                                {signalHistory.map((item, index) => (
+                                                    <div key={index} onClick={() => setSelectedHistoryItem(item)} className="bg-slate-900/50 p-3 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors group">
+                                                        <div className="flex flex-col">
+                                                            <div className={`text-xs font-bold ${getSignalColor(item.type)} flex items-center gap-1`}>
+                                                                {item.leaderText} <Info size={10} className="opacity-50 group-hover:opacity-100"/>
+                                                            </div>
+                                                            <span className="text-[10px] text-slate-500 mt-0.5">
+                                                                {item.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})} • {item.time.toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-mono font-bold text-white">${item.price.toFixed(0)}</div>
+                                                            <div className="text-[9px] text-slate-500 uppercase">Price</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <button onClick={() => setSignalHistory([])} className="w-full mt-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-bold border border-red-500/30">Clear History</button>
+                                    </>
+                                )}
+
+                                {activeModal === 'fundamental_details' && (
+                                    <>
+                                        <h3 className="font-bold text-white mb-4 flex gap-2 items-center"><Globe size={20} className="text-blue-400"/> Fundamental Khulasa</h3>
+                                        <div className="space-y-4">
+                                            {/* Market Mood Section */}
+                                            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                                                <h4 className={`text-sm font-bold uppercase mb-2 ${funSignal.type === 'BUY' ? 'text-green-400' : funSignal.type === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`}>OVERALL MOOD: {funSignal.text}</h4>
+                                                <p className="text-sm text-slate-200 leading-relaxed font-sans">{funSignal.urdu}</p>
+                                            </div>
+
+                                            {/* Key Factors Section */}
+                                            <div className="space-y-2">
+                                                <h4 className="text-xs text-slate-500 uppercase font-bold">Key Drivers:</h4>
+                                                <div className="flex items-center gap-2 text-xs text-slate-300"><span className="text-green-400">●</span> ETF Flows ({newsData.etf.total > 0 ? '+' : ''}{newsData.etf.total}M)</div>
+                                                <div className="flex items-center gap-2 text-xs text-slate-300"><span className="text-blue-400">●</span> Macro Sentiment ({newsData.calendar.length > 0 ? 'Active' : 'Quiet'})</div>
+                                            </div>
+
+                                            {/* Latest High Impact News List */}
+                                            <div className="pt-2 border-t border-slate-700">
+                                                <h4 className="text-xs text-slate-400 uppercase font-bold mb-3 flex items-center gap-2">
+                                                    <Zap size={12} className="text-yellow-400"/> Latest High Impact News
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {newsData.headlines.slice(0, 3).map((h, i) => (
+                                                        <div key={i} onClick={() => setSelectedNews({...h, isHeadline: true})} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors group">
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] text-blue-400 font-bold uppercase bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-500/20">
+                                                                        {h.source_info?.name || 'CryptoNews'}
+                                                                    </span>
+                                                                    
+                                                                    {/* IMPACT ARROWS */}
+                                                                    {(h.urdu?.sentiment === 'Bullish' || h.urdu?.sentiment === 'Institutional') && (
+                                                                        <div className="flex items-center gap-1 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">
+                                                                            <ArrowUpCircle size={12} className="text-green-400"/>
+                                                                            <span className="text-[9px] font-bold text-green-400 uppercase">Buy Impact</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {h.urdu?.sentiment === 'Bearish' && (
+                                                                        <div className="flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
+                                                                            <ArrowDownCircle size={12} className="text-red-400"/>
+                                                                            <span className="text-[9px] font-bold text-red-400 uppercase">Sell Impact</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {(!h.urdu?.sentiment || h.urdu?.sentiment === 'Neutral' || h.urdu?.sentiment === 'Critical') && (
+                                                                        <div className="flex items-center gap-1 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
+                                                                            <Activity size={12} className="text-yellow-400"/>
+                                                                            <span className="text-[9px] font-bold text-yellow-400 uppercase">Neutral</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[9px] text-slate-500">{h.displayTime}</span>
+                                                            </div>
+                                                            <h5 className="text-xs font-bold text-white line-clamp-2 leading-tight mb-2 group-hover:text-blue-300 transition-colors">
+                                                                {h.title}
+                                                            </h5>
+                                                            <div className="flex items-center gap-1">
+                                                                <div className="h-[1px] flex-1 bg-slate-700"></div>
+                                                                <span className="text-[9px] text-slate-400 flex items-center gap-1 group-hover:text-white">
+                                                                    Tap for Urdu Analysis <ArrowRight size={10}/>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {newsData.headlines.length === 0 && (
+                                                        <div className="text-center py-4 text-xs text-slate-500">Loading News...</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {activeModal === 'rsi' && (
+                                    <>
+                                        <h3 className="font-bold text-white mb-4 flex gap-2 items-center">
+                                            <Activity size={20} className="text-blue-400"/> RSI Momentum (14)
+                                        </h3>
+                                        
+                                        <div className="flex flex-col items-center justify-center mb-6">
+                                            <span className="text-5xl font-black text-white tracking-tighter">{rsi}</span>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase mt-2 ${rsi > 70 ? 'bg-red-500/20 text-red-400' : rsi < 30 ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-300'}`}>
+                                                {rsi > 70 ? 'OVERBOUGHT' : rsi < 30 ? 'OVERSOLD' : 'NEUTRAL ZONE'}
+                                            </span>
+                                        </div>
+
+                                        <div className="relative h-8 w-full bg-slate-800 rounded-full mb-2 overflow-hidden border border-slate-600">
+                                            <div className="absolute left-0 top-0 h-full w-[30%] bg-green-500/30 border-r border-slate-600"></div>
+                                            <div className="absolute left-[30%] top-0 h-full w-[40%] bg-slate-500/10"></div>
+                                            <div className="absolute right-0 top-0 h-full w-[30%] bg-red-500/30 border-l border-slate-600"></div>
+                                            
+                                            <div 
+                                                className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_white] transition-all duration-500 ease-out z-10"
+                                                style={{ left: `${rsi}%` }}
+                                            ></div>
+                                        </div>
+                                        
+                                        <div className="flex justify-between text-[10px] text-slate-500 font-mono mb-6 px-1">
+                                            <span>0</span><span className="text-green-400 font-bold">30</span><span>50</span><span className="text-red-400 font-bold">70</span><span>100</span>
+                                        </div>
+
+                                        <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-2">
+                                            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                                                <span className="text-xs text-slate-400">Condition</span>
+                                                <span className="text-sm text-white font-bold">
+                                                    {rsi > 70 ? "Selling High" : rsi < 30 ? "Buying Low" : "Trend Following"}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="pt-1">
+                                                <span className="text-xs text-slate-400 block mb-1">Trading Advice:</span>
+                                                <p className="text-sm text-slate-300 leading-relaxed">
+                                                    {rsi >= 70 ? "Market heavily overbought hai. Buying risky hai. Reversal pattern ya divergence ka wait karein phir Short (Sell) karein." : rsi <= 30 ? "Market heavily oversold hai. Selling risky hai. Support rejection ka wait karein phir Long (Buy) karein." : "Market momentum neutral hai. Price Action aur Trend lines ko follow karein. Beach main trade avoid karein."}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {activeModal === 'news' && (
+                                    <>
+                                        <h3 className="font-bold text-white mb-4 flex gap-2 items-center"><Calendar size={20} className="text-red-400"/> News Center</h3>
+                                        <div className="flex gap-2 mb-4">
+                                            <button onClick={()=>setActiveNewsTab('calendar')} className={`flex-1 py-1 text-xs rounded ${activeNewsTab==='calendar'?'bg-slate-600 text-white':'text-slate-400'}`}>Calendar</button>
+                                            <button onClick={()=>setActiveNewsTab('headlines')} className={`flex-1 py-1 text-xs rounded ${activeNewsTab==='headlines'?'bg-slate-600 text-white':'text-slate-400'}`}>Headlines</button>
+                                            <button onClick={()=>setActiveNewsTab('etf')} className={`flex-1 py-1 text-xs rounded ${activeNewsTab==='etf'?'bg-slate-600 text-white':'text-slate-400'}`}>ETF</button>
+                                        </div>
+                                        <div className="overflow-y-auto flex-1 space-y-2">
+                                            {activeNewsTab==='calendar' && newsData.calendar.map((n,i)=>(
+                                                <div key={i} onClick={() => setSelectedNews(n)} className={`bg-slate-700/30 p-2 rounded border border-slate-700 flex justify-between items-center hover:bg-slate-700/50 cursor-pointer`}>
+                                                    <div><div className="text-[10px] text-slate-400">{n.displayTime}</div><div className="text-xs font-bold text-white">{n.title}</div></div>
+                                                    <div className="text-[10px] font-mono text-right"><div>F: {n.fcst}</div><div className={n.isPassed?'text-slate-500':'text-green-400'}>{n.isPassed?'Released':getCountdown(n.eventDate)}</div></div>
+                                                </div>
+                                            ))}
+                                            {activeNewsTab==='etf' && (
+                                                <div className="space-y-2">
+                                                    <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
+                                                        <div className="text-[10px] uppercase text-slate-400">Net Daily Flow</div>
+                                                        <div className={`text-xl font-bold ${newsData.etf.total>0?'text-green-400':'text-red-400'}`}>{newsData.etf.total>0?'+':''}{newsData.etf.total}M USD</div>
+                                                    </div>
+                                                    {newsData.etf.list.map((e,i)=>(
+                                                        <div key={i} className="flex justify-between text-xs p-2 bg-slate-900/50 rounded">
+                                                            <span>{e.ticker}</span><span className={e.flow>0?'text-green-400':'text-red-400'}>{e.flow}M</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {activeNewsTab==='headlines' && newsData.headlines.map((h,i)=>(
+                                                <div key={i} onClick={() => setSelectedNews({...h, isHeadline: true})} className="block p-2 bg-slate-700/30 rounded border border-slate-700 text-xs hover:bg-slate-700/50 flex gap-2 cursor-pointer">
+                                                    <div className="w-12 h-12 bg-slate-800 rounded shrink-0 overflow-hidden"><img src={h.imageurl} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/></div>
+                                                    <div><div className="font-bold line-clamp-2">{h.title}</div><div className="text-[9px] text-slate-400 mt-1">{h.source_info?.name}</div></div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {activeModal === 'trend' && (
+                                    <>
+                                        <h3 className="font-bold text-white mb-4 flex gap-2 items-center"><BarChart size={20} className="text-purple-400"/> Trend Analysis</h3>
+                                        <div className="space-y-2 text-sm text-slate-300">
+                                            <p>Trend based on M15 structure and volume. <br/> Current Bias: <strong className="text-white">{trendInfo.label}</strong></p>
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeModal === 'live_chart' && (
+                                    <>
+                                        <div className={`flex justify-between items-center ${isLandscape ? 'mb-1 px-4 mt-2' : 'mb-2'}`}>
+                                            <h3 className="font-bold text-white flex gap-2 items-center shrink-0"><BarChart size={20} className="text-blue-400"/> Live Market Chart</h3>
+                                            
+                                            {/* Rotate Button */}
+                                            <button 
+                                                onClick={() => setIsLandscape(!isLandscape)} 
+                                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isLandscape ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}
+                                            >
+                                                <RotateCw size={14} className={isLandscape ? "-rotate-90" : ""} />
+                                                {isLandscape ? "Normal View" : "Rotate View"}
+                                            </button>
+                                        </div>
+
+                                        <div className="w-full flex-1 bg-slate-900 rounded-xl overflow-hidden border border-slate-700 relative min-h-0">
+                                            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs">Loading Chart...</div>
+                                            <iframe 
+                                                src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76d87&symbol=BINANCE%3ABTCUSDT&interval=15&hidesidetoolbar=1&hidetoptoolbar=1&symboledit=1&saveimage=1&toolbarbg=0f172a&studies=[]&hideideas=1&theme=Dark&style=1&timezone=Asia%2FKarachi&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=BINANCE%3ABTCUSDT" 
+                                                className="w-full h-full relative z-10"
+                                                frameBorder="0"
+                                                allowtransparency="true"
+                                                allowFullScreen>
+                                            </iframe>
+                                        </div>
+                                        <div className="mt-2 text-[10px] text-center text-slate-400 shrink-0">
+                                            Source: TradingView • M15 Timeframe
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedNews && (
+                        <div className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4" onClick={() => setSelectedNews(null)}>
+                            <div className="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border-2 border-slate-600 relative shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setSelectedNews(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-700/50 p-2 rounded-full"><X size={20}/></button>
+                                
+                                {/* Source Badge */}
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider shadow-lg">
+                                        {selectedNews.source_info?.name || 'News Source'}
+                                    </span>
+                                    {selectedNews.isHeadline && (
+                                        <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider">High Impact</span>
+                                    )}
+                                </div>
+
+                                <h3 className="text-xl font-bold text-white mb-2 leading-tight">{selectedNews.title}</h3>
+                                <p className="text-sm text-slate-400 mb-4 font-mono">{selectedNews.displayTime || 'Just Now'} | {selectedNews.currency || 'CRYPTO'}</p>
+                                
+                                {!selectedNews.isHeadline && selectedNews.isPassed ? (<><div className="grid grid-cols-3 gap-2 mb-4"><div className="bg-slate-900 p-2 rounded-lg border border-slate-700 text-center"><span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Actual</span><span className={`text-sm font-mono font-bold ${selectedNews.direction === 'Bullish' ? 'text-green-400' : 'text-red-400'}`}>{selectedNews.actual}</span></div><div className="bg-slate-900 p-2 rounded-lg border border-slate-700 text-center"><span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Forecast</span><span className="text-sm font-mono text-white">{selectedNews.fcst}</span></div><div className="bg-slate-900 p-2 rounded-lg border border-slate-700 text-center"><span className="block text-[10px] text-slate-500 uppercase font-bold mb-1">Previous</span><span className="text-sm font-mono text-white">{selectedNews.prev}</span></div></div></>) : null}
+                                
+                                <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-2 opacity-5"><FileText size={80}/></div>
+                                    <h4 className="text-blue-400 text-xs font-bold uppercase mb-2 flex items-center gap-2 relative z-10"><Info size={14}/> Urdu Khulasa (Summary)</h4>
+                                    <p className="text-slate-200 text-sm leading-relaxed relative z-10">
+                                        {selectedNews.urdu?.text || selectedNews.urduAnalysis?.text || (typeof selectedNews.urdu === 'string' ? selectedNews.urdu : "Analysis loading...")}
+                                    </p>
+                                </div>
+                                
+                                {selectedNews.isHeadline && (
+                                    <a href={selectedNews.url} target="_blank" className="flex items-center justify-center gap-2 w-full text-center mt-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-white text-sm border border-slate-600 transition-all">
+                                        Read Original on {selectedNews.source_info?.name || 'Source'} <LinkIcon size={14}/>
+                                    </a>
+                                )}
+                                
+                                <button onClick={() => setSelectedNews(null)} className="w-full mt-2 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg">Close</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedHistoryItem && (
+                        <div className="fixed inset-0 bg-black/95 z-[70] flex items-center justify-center p-4" onClick={() => setSelectedHistoryItem(null)}>
+                            <div className="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border-2 border-slate-600 relative shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setSelectedHistoryItem(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-700/50 p-2 rounded-full"><X size={20}/></button>
+                                
+                                <div className="flex items-center gap-2 mb-4">
+                                     <HistoryIcon size={20} className="text-blue-400"/>
+                                     <span className="text-slate-400 font-bold text-xs uppercase">Historical Record</span>
+                                </div>
+
+                                <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 mb-4 text-center">
+                                     <div className="text-xs text-slate-500 font-bold uppercase mb-1">Trigger Price</div>
+                                     <div className="text-3xl font-bold text-white tracking-tight">${selectedHistoryItem.price.toFixed(0)}</div>
+                                     <div className="text-xs text-slate-500 font-mono mt-2 flex justify-center gap-4">
+                                        <span>📅 {selectedHistoryItem.time.toLocaleDateString()}</span>
+                                        <span>⏰ {selectedHistoryItem.time.toLocaleTimeString()}</span>
+                                     </div>
+                                </div>
+
+                                <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative overflow-hidden mb-4">
+                                    <div className={`absolute top-0 right-0 p-2 opacity-10 ${getSignalColor(selectedHistoryItem.type)}`}>
+                                        {selectedHistoryItem.type === 'BUY' ? <TrendingUp size={80}/> : selectedHistoryItem.type === 'SELL' ? <TrendingDown size={80}/> : <Activity size={80}/>}
+                                    </div>
+                                    <h4 className={`text-sm font-bold uppercase mb-2 ${getSignalColor(selectedHistoryItem.type)} relative z-10 flex items-center gap-2`}>
+                                        {selectedHistoryItem.leaderText}
+                                    </h4>
+                                    <div className="h-[1px] w-full bg-slate-700/50 mb-2"></div>
+                                    <h5 className="text-[10px] text-slate-400 uppercase font-bold mb-1">Logic / Reason:</h5>
+                                    <p className="text-sm text-slate-200 leading-relaxed font-sans relative z-10">{selectedHistoryItem.urdu}</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => shareHistoryItemToWhatsapp(selectedHistoryItem)} className="flex items-center justify-center gap-2 py-3 bg-[#25D366] hover:bg-[#20bd5a] rounded-xl font-bold text-white text-sm shadow-lg transition-transform active:scale-95">
+                                        <Share2 size={18} /> Share
+                                    </button>
+                                    <button onClick={() => setSelectedHistoryItem(null)} className="py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<BitcoinSignalApp />);
+    </script>
+</body>
+</html>
